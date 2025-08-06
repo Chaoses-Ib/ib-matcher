@@ -4,13 +4,9 @@ version = "0.1.0"
 edition = "2021"
 description = "Unicode utils"
 keywords = ["unicode", "case"]
+repository = "https://github.com/Chaoses-Ib/ib-matcher/tree/master/ib-unicode"
 authors.workspace = true
-homepage.workspace = true
-repository.workspace = true
 license.workspace = true
-
-[dependencies]
-document-features = { version = "0.2.11", optional = true }
 
 [features]
 default = []
@@ -21,6 +17,9 @@ perf = ["perf-case-map"]
 perf-case-map = []
 
 doc = ["dep:document-features"]
+
+[dependencies]
+document-features = { version = "0.2.11", optional = true }
 
 [package.metadata.docs.rs]
 # We want to document all features.

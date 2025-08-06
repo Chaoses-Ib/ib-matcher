@@ -100,6 +100,18 @@ IsMatch := IbPinyin_Match("pysousuoeve", "拼音搜索Everything", IbPinyin_Asci
 ```
 [下载](https://github.com/Chaoses-Ib/ib-matcher/releases)
 
+## [ib-romaji](ib-romaji/README.md)
+[![crates.io](https://img.shields.io/crates/v/ib-romaji.svg)](https://crates.io/crates/ib-romaji)
+[![Documentation](https://docs.rs/ib-romaji/badge.svg)](https://docs.rs/ib-romaji)
+
+A fast Japanese romanizer.
+
+## [ib-unicode](ib-unicode/README.md)
+[![crates.io](https://img.shields.io/crates/v/ib-unicode.svg)](https://crates.io/crates/ib-unicode)
+[![Documentation](https://docs.rs/ib-unicode/badge.svg)](https://docs.rs/ib-unicode)
+
+Unicode utils.
+
 ## 其它拼音相关项目
 语言 | 库 | 拼音 | 双拼 | 词典 | 匹配 | 其它
 --- | --- | --- | --- | --- | --- | ---
