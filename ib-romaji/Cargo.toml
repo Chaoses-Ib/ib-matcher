@@ -4,9 +4,8 @@ version = "0.1.1"
 edition = "2024"
 description = "A fast Japanese romanizer"
 keywords = ["romaji", "japanese", "cjk"]
+repository = "https://github.com/Chaoses-Ib/ib-matcher/tree/master/ib-romaji"
 authors.workspace = true
-homepage.workspace = true
-repository.workspace = true
 license.workspace = true
 
 [features]

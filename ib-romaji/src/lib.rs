@@ -1,6 +1,23 @@
 //! A fast Japanese romanizer.
 //!
-//! The dictionary will take ~5.5 MiB in the binary at the moment.
+//! ## Usage
+//! ```rust
+//! use ib_romaji::HepburnRomanizer;
+//!
+//! let romanizer = HepburnRomanizer::default();
+//!
+//! let mut romajis = Vec::new();
+//! romanizer.romanize_and_try_for_each("日本語", |len, romaji| {
+//!     romajis.push((len, romaji));
+//!     None::<()>
+//! });
+//! assert_eq!(romajis, vec![(9, "nippongo"), (3, "a"), (3, "aki"), (3, "bi"), (3, "chi"), (3, "he"), (3, "hi"), (3, "iru"), (3, "jitsu"), (3, "ka"), (3, "kou"), (3, "ku"), (3, "kusa"), (3, "nchi"), (3, "ni"), (3, "nichi"), (3, "nitsu"), (3, "su"), (3, "tachi")]);
+//!
+//! assert_eq!(romanizer.romanize_vec("日本語"), vec![(9, "nippongo"), (3, "a"), (3, "aki"), (3, "bi"), (3, "chi"), (3, "he"), (3, "hi"), (3, "iru"), (3, "jitsu"), (3, "ka"), (3, "kou"), (3, "ku"), (3, "kusa"), (3, "nchi"), (3, "ni"), (3, "nichi"), (3, "nitsu"), (3, "su"), (3, "tachi")]);
+//! ```
+//!
+//! ## Binary size
+//! The dictionary will take ~4.8 MiB (5.5 MiB without compression) in the binary at the moment.
 //!
 //! ## Design
 //! `&[&str]` will cause each str to occupy 16 extra bytes to store the pointer and length. While CStr only needs 1 byte for each str.
@@ -84,6 +101,9 @@ impl HepburnRomanizer {
         Self { ac, kanji }
     }
 
+    /// Romanize the first kana in the string, and return the length of the kana and the romaji.
+    ///
+    /// ## Example
     /// ```
     /// use ib_romaji::HepburnRomanizer;
     ///
@@ -107,6 +127,7 @@ impl HepburnRomanizer {
             .map(|&romaji| (len, romaji))
     }
 
+    /// Romanize kanas from the beginning of the string until a non-kana character, and return the length of the kanas and the romajis.
     pub fn romanize_kana_str<S: ?Sized + AsRef<str>>(&self, s: &S) -> Option<(usize, String)> {
         let s = s.as_ref();
         let mut len = 0;
@@ -127,6 +148,7 @@ impl HepburnRomanizer {
         if len == 0 { None } else { Some((len, buf)) }
     }
 
+    /// Romanize kana text to romajis. Returns `None` if there is any non-kana character in the string.
     pub fn romanize_kana_str_all<S: ?Sized + AsRef<str>>(&self, s: &S) -> Option<String> {
         let s = s.as_ref();
         match self.romanize_kana_str(s) {
@@ -135,6 +157,24 @@ impl HepburnRomanizer {
         }
     }
 
+    /// Romanize the first word in the string, and call `f` for each possible romanization.
+    ///
+    /// `f` can return `Some(_)` to stop the iteration, or `None` to continue.
+    ///
+    /// ## Example
+    /// ```
+    /// use ib_romaji::HepburnRomanizer;
+    ///
+    /// let mut romajis = Vec::new();
+    /// HepburnRomanizer::default().romanize_and_try_for_each("日本語", |len, romaji| {
+    ///     romajis.push((len, romaji));
+    ///     None::<()>
+    /// });
+    /// assert_eq!(romajis, vec![(9, "nippongo"), (3, "a"), (3, "aki"), (3, "bi"), (3, "chi"), (3, "he"), (3, "hi"), (3, "iru"), (3, "jitsu"), (3, "ka"), (3, "kou"), (3, "ku"), (3, "kusa"), (3, "nchi"), (3, "ni"), (3, "nichi"), (3, "nitsu"), (3, "su"), (3, "tachi")]);
+    /// ```
+    ///
+    /// ## See also
+    /// [`romanize_vec()`](Self::romanize_vec) for a version that returns a `Vec` of all possible romanizations.
     pub fn romanize_and_try_for_each<S: ?Sized + AsRef<str>, T>(
         &self,
         s: &S,
@@ -184,6 +224,14 @@ impl HepburnRomanizer {
         None
     }
 
+    /// Romanize the first word in the string, and return a `Vec` for all possible romanization.
+    ///
+    /// ## Example
+    /// ```
+    /// use ib_romaji::HepburnRomanizer;
+    ///
+    /// assert_eq!(HepburnRomanizer::default().romanize_vec("日本語"), vec![(9, "nippongo"), (3, "a"), (3, "aki"), (3, "bi"), (3, "chi"), (3, "he"), (3, "hi"), (3, "iru"), (3, "jitsu"), (3, "ka"), (3, "kou"), (3, "ku"), (3, "kusa"), (3, "nchi"), (3, "ni"), (3, "nichi"), (3, "nitsu"), (3, "su"), (3, "tachi")]);
+    /// ```
     pub fn romanize_vec<S: ?Sized + AsRef<str>>(&self, s: &S) -> Vec<(usize, &'static str)> {
         let mut results = Vec::new();
         self.romanize_and_try_for_each(s, |len, romaji| {
@@ -193,6 +241,9 @@ impl HepburnRomanizer {
         results
     }
 
+    /// Check if the string can be fully romanized.
+    ///
+    /// This function can be used to test if the string is a possible Japanese text or not.
     pub fn is_romanizable<S: ?Sized + AsRef<str>>(&self, s: &S) -> bool {
         let s = s.as_ref();
         if s.is_empty() {
@@ -202,6 +253,7 @@ impl HepburnRomanizer {
             .is_some()
     }
 
+    /// Check if the string can be fully romanized to the given romaji.
     pub fn is_romanizable_to<S: ?Sized + AsRef<str>>(&self, s: &S, romaji: &S) -> bool {
         let s = s.as_ref();
         let romaji = romaji.as_ref();
