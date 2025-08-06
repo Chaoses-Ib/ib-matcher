@@ -30,7 +30,7 @@ syntax = []
 ## Enables all performance related features. This feature is enabled by default is intended to cover all reasonable features that improve performance, even if more are added in the future.
 perf = ["perf-unicode-case-map"]
 ## -37% match time, +38 KiB
-perf-unicode-case-map = ["ib-unicode/perf-unicode-case-map"]
+perf-unicode-case-map = ["ib-unicode/perf-case-map"]
 
 ## Not used at the moment.
 ## 

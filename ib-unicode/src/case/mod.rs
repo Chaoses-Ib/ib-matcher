@@ -1,4 +1,4 @@
-#[cfg(feature = "perf-unicode-case-map")]
+#[cfg(feature = "perf-case-map")]
 mod map;
 
 pub trait CharToMonoLowercase {
@@ -8,12 +8,12 @@ pub trait CharToMonoLowercase {
 
 impl CharToMonoLowercase for char {
     fn to_mono_lowercase(self) -> char {
-        #[cfg(not(feature = "perf-unicode-case-map"))]
+        #[cfg(not(feature = "perf-case-map"))]
         return self.to_lowercase().next().unwrap();
 
         // Optimize away the binary search
         // Reduce total match time by ~37%
-        #[cfg(feature = "perf-unicode-case-map")]
+        #[cfg(feature = "perf-case-map")]
         map::to_mono_lowercase(self)
     }
 }

@@ -16,9 +16,9 @@ document-features = { version = "0.2.11", optional = true }
 default = []
 
 ## Enables all performance related features. This feature is intended to cover all reasonable features that improve performance, even if more are added in the future.
-perf = ["perf-unicode-case-map"]
+perf = ["perf-case-map"]
 ## -37% match time, +38 KiB
-perf-unicode-case-map = []
+perf-case-map = []
 
 doc = ["dep:document-features"]
 
