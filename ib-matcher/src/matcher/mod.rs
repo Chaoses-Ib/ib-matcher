@@ -18,7 +18,7 @@ pub mod encoding;
 pub mod input;
 mod matches;
 pub mod pattern;
-#[cfg(feature = "regex")]
+#[cfg(feature = "perf-regex-plain")]
 mod regex_utils;
 
 mod ascii;

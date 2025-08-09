@@ -26,6 +26,7 @@ romaji-compress-words = ["ib-romaji?/compress-words"]
 
 ## Pattern syntax support. See [`syntax`] for details.
 syntax = []
+regex = ["dep:regex-automata"]
 
 ## Enables all performance related features. This feature is enabled by default is intended to cover all reasonable features that improve performance, even if more are added in the future.
 perf = ["perf-unicode-case-map"]
@@ -35,7 +36,7 @@ perf-unicode-case-map = ["ib-unicode/perf-case-map"]
 ## Not used at the moment.
 ## 
 ## Build size +837.5 KiB
-regex = ["dep:regex"]
+perf-regex-plain = ["dep:regex"]
 
 ## Make [`pinyin::PinyinData`] interior mutable. So it can be easily used as a `static` variable.
 inmut-data = []
@@ -62,12 +63,17 @@ regex = { version = "1.10.2", default-features = false, features = [
     "std",
     "perf",
 ], optional = true }
+# TODO: perf, unicode
+regex-automata = { version = "0.4", default-features = false, features = [
+    "nfa-thompson",
+    "std",
+], optional = true }
 widestring = { version = "1.0.2", optional = true }
 
 [dev-dependencies]
 criterion = "0.6"
 daachorse = "1"
-ib-matcher = { features = ["pinyin", "romaji", "syntax"], path = "." }
+ib-matcher = { features = ["pinyin", "romaji", "syntax", "regex"], path = "." }
 
 [[bench]]
 name = "matcher"

@@ -40,6 +40,8 @@ pub mod matcher;
 pub mod minimal;
 #[cfg(feature = "pinyin")]
 pub mod pinyin;
+#[cfg(feature = "regex")]
+pub mod regex;
 #[cfg(feature = "syntax")]
 pub mod syntax;
 pub mod unicode;

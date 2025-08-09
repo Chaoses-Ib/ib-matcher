@@ -365,6 +365,7 @@ dependencies = [
  "ib-unicode",
  "itertools 0.14.0",
  "regex",
+ "regex-automata",
  "widestring",
 ]
 

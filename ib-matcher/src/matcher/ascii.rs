@@ -28,7 +28,7 @@ pub enum AsciiMatcher<const CHAR_LEN: usize = 1> {
     /// - build -60%, `build_analyze` -25%
     /// - Build size -837.5 KiB
     Ac(AcMatcher),
-    #[cfg(feature = "regex")]
+    #[cfg(feature = "perf-regex-plain")]
     #[allow(unused)]
     Regex(regex::bytes::Regex),
 }
@@ -114,7 +114,7 @@ impl<const CHAR_LEN: usize> AsciiMatcher<CHAR_LEN> {
                     })
                 }
             }
-            #[cfg(feature = "regex")]
+            #[cfg(feature = "perf-regex-plain")]
             Regex(regex) => regex.find(haystack).map(|m| Match {
                 start: m.start() / CHAR_LEN,
                 end: m.end() / CHAR_LEN,
@@ -133,7 +133,7 @@ impl<const CHAR_LEN: usize> AsciiMatcher<CHAR_LEN> {
                     ac.ac.is_match(ac.input(haystack))
                 }
             }
-            #[cfg(feature = "regex")]
+            #[cfg(feature = "perf-regex-plain")]
             Regex(regex) => regex.is_match(haystack),
         }
     }
@@ -162,7 +162,7 @@ impl<const CHAR_LEN: usize> AsciiMatcher<CHAR_LEN> {
                 }
             }
             // TODO: Use regex-automata's anchored searches?
-            #[cfg(feature = "regex")]
+            #[cfg(feature = "perf-regex-plain")]
             Regex(regex) => regex
                 .find(haystack.as_bytes())
                 .filter(|m| m.start() == 0)
