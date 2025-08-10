@@ -486,7 +486,7 @@ mod tests {
     #[test]
     fn patch_bytes() {
         let (hir, literals) =
-            syntax::fold::parse_and_fold_literal_str("pyss").unwrap();
+            syntax::fold::parse_and_fold_literal_utf8("pyss").unwrap();
         let mut nfa: NFA =
             thompson::Compiler::new().build_from_hir(&hir).unwrap().into();
         nfa.patch_bytes_to_matchers(|b| {
