@@ -79,7 +79,13 @@ widestring = { version = "1.0.2", optional = true }
 [dev-dependencies]
 criterion = "0.6"
 daachorse = "1"
-ib-matcher = { features = ["pinyin", "romaji", "syntax", "regex"], path = "." }
+ib-matcher = { features = [
+    "pinyin",
+    "romaji",
+    "syntax",
+    "regex",
+    "regex-syntax",
+], path = "." }
 
 [[bench]]
 name = "matcher"
