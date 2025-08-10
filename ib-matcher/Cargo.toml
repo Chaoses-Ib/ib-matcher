@@ -26,10 +26,16 @@ romaji-compress-words = ["ib-romaji?/compress-words"]
 
 ## Pattern syntax support. See [`syntax`] for details.
 syntax = []
+
 regex = ["dep:regex-automata"]
+regex-syntax = ["regex-automata?/syntax"]
 
 ## Enables all performance related features. This feature is enabled by default is intended to cover all reasonable features that improve performance, even if more are added in the future.
-perf = ["perf-unicode-case-map"]
+perf = ["perf-inline", "perf-unicode-case-map"]
+## Enables aggressive use of inlining.
+## 
+## When enabled, `inline(always)` is used in (many) strategic locations to help performance at the expense of longer compile times and increased binary size.
+perf-inline = ["regex-automata?/perf-inline"]
 ## -37% match time, +38 KiB
 perf-unicode-case-map = ["ib-unicode/perf-case-map"]
 

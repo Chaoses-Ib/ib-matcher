@@ -12,16 +12,18 @@ because it does less book-keeping.
 
 use alloc::{vec, vec::Vec};
 
-use crate::{
+use regex_automata::{
     nfa::thompson::{self, BuildError, State, NFA},
     util::{
         captures::Captures,
-        empty, iter,
+        iter,
         prefilter::Prefilter,
         primitives::{NonMaxUsize, PatternID, SmallIndex, StateID},
-        search::{Anchored, HalfMatch, Input, Match, MatchError, Span},
     },
+    Anchored, HalfMatch, Input, Match, MatchError, Span,
 };
+
+use crate::regex::util::empty;
 
 /// Returns the minimum visited capacity for the given haystack.
 ///
@@ -255,7 +257,7 @@ impl Config {
 #[derive(Clone, Debug)]
 pub struct Builder {
     config: Config,
-    #[cfg(feature = "syntax")]
+    #[cfg(feature = "regex-syntax")]
     thompson: thompson::Compiler,
 }
 
@@ -264,7 +266,7 @@ impl Builder {
     pub fn new() -> Builder {
         Builder {
             config: Config::default(),
-            #[cfg(feature = "syntax")]
+            #[cfg(feature = "regex-syntax")]
             thompson: thompson::Compiler::new(),
         }
     }
@@ -273,7 +275,7 @@ impl Builder {
     ///
     /// If there was a problem parsing or compiling the pattern, then an error
     /// is returned.
-    #[cfg(feature = "syntax")]
+    #[cfg(feature = "regex-syntax")]
     pub fn build(
         &self,
         pattern: &str,
@@ -282,7 +284,7 @@ impl Builder {
     }
 
     /// Build a `BoundedBacktracker` from the given patterns.
-    #[cfg(feature = "syntax")]
+    #[cfg(feature = "regex-syntax")]
     pub fn build_many<P: AsRef<str>>(
         &self,
         patterns: &[P],
@@ -300,7 +302,10 @@ impl Builder {
         &self,
         nfa: NFA,
     ) -> Result<BoundedBacktracker, BuildError> {
-        nfa.look_set_any().available().map_err(BuildError::word)?;
+        nfa.look_set_any()
+            .available()
+            // .map_err(BuildError::word)?;
+            .unwrap();
         Ok(BoundedBacktracker { config: self.config.clone(), nfa })
     }
 
@@ -319,10 +324,10 @@ impl Builder {
     ///
     /// These settings only apply when constructing a `BoundedBacktracker`
     /// directly from a pattern.
-    #[cfg(feature = "syntax")]
+    #[cfg(feature = "regex-syntax")]
     pub fn syntax(
         &mut self,
-        config: crate::util::syntax::Config,
+        config: regex_automata::util::syntax::Config,
     ) -> &mut Builder {
         self.thompson.syntax(config);
         self
@@ -336,7 +341,7 @@ impl Builder {
     ///
     /// These settings only apply when constructing a `BoundedBacktracker`
     /// directly from a pattern.
-    #[cfg(feature = "syntax")]
+    #[cfg(feature = "regex-syntax")]
     pub fn thompson(&mut self, config: thompson::Config) -> &mut Builder {
         self.thompson.configure(config);
         self
@@ -452,7 +457,7 @@ impl BoundedBacktracker {
     /// );
     /// # Ok::<(), Box<dyn std::error::Error>>(())
     /// ```
-    #[cfg(feature = "syntax")]
+    #[cfg(feature = "regex-syntax")]
     pub fn new(pattern: &str) -> Result<BoundedBacktracker, BuildError> {
         BoundedBacktracker::builder().build(pattern)
     }
@@ -481,7 +486,7 @@ impl BoundedBacktracker {
     /// assert_eq!(None, it.next());
     /// # Ok::<(), Box<dyn std::error::Error>>(())
     /// ```
-    #[cfg(feature = "syntax")]
+    #[cfg(feature = "regex-syntax")]
     pub fn new_many<P: AsRef<str>>(
         patterns: &[P],
     ) -> Result<BoundedBacktracker, BuildError> {
@@ -1510,7 +1515,7 @@ impl BoundedBacktracker {
                     // OK because we don't permit building a searcher with a
                     // Unicode word boundary if the requisite Unicode data is
                     // unavailable.
-                    if !self.nfa.look_matcher().matches_inline(
+                    if !self.nfa.look_matcher().matches(
                         look,
                         input.haystack(),
                         at,
@@ -1888,6 +1893,7 @@ fn div_ceil(lhs: usize, rhs: usize) -> usize {
 
 #[cfg(test)]
 mod tests {
+    #[cfg(feature = "regex-syntax")]
     use super::*;
 
     // This is a regression test for the maximum haystack length computation.
@@ -1896,7 +1902,7 @@ mod tests {
     // is of course no guarantee that this is true. This regression test
     // ensures that not only does `max_haystack_len` not panic, but that it
     // should return `0`.
-    #[cfg(feature = "syntax")]
+    #[cfg(feature = "regex-syntax")]
     #[test]
     fn max_haystack_len_overflow() {
         let re = BoundedBacktracker::builder()

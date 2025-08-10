@@ -35,6 +35,8 @@
 #![cfg_attr(docsrs, feature(doc_auto_cfg))]
 #![cfg_attr(feature = "doc", doc = document_features::document_features!())]
 
+extern crate alloc;
+
 pub mod matcher;
 #[cfg(feature = "minimal")]
 pub mod minimal;

@@ -154,7 +154,7 @@ like we did for `(?-u:\B)`. But thankfully our more robust approach in this
 crate handles that case just fine too.)
 */
 
-use crate::util::search::{Input, MatchError};
+use regex_automata::{Input, MatchError};
 
 #[cold]
 #[inline(never)]
@@ -170,6 +170,7 @@ where
     skip_splits(true, input, init_value, match_offset, find)
 }
 
+#[allow(dead_code)]
 #[cold]
 #[inline(never)]
 pub(crate) fn skip_splits_rev<T, F>(
