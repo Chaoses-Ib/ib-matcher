@@ -1,6 +1,6 @@
 use std::{fmt::Debug, marker::PhantomData};
 
-use bon::bon;
+use bon::{bon, Builder};
 
 use crate::{
     matcher::{
@@ -33,6 +33,58 @@ pub use matches::{Match, OptionMatchExt};
 pub use pinyin::*;
 #[cfg(feature = "romaji")]
 pub use romaji::*;
+
+#[derive(Builder)]
+pub struct MatchConfig<'a> {
+    /// For more advanced control over the analysis, use [`MatchConfigBuilder::analyze_config`].
+    #[builder(default = false)]
+    analyze: bool,
+    analyze_config: Option<analyze::PatternAnalyzeConfig>,
+
+    /// If `true`, the pattern can match pinyins/romajis starting with the ending of the pattern.
+    ///
+    /// For example, pattern "pinyi" can match "拼音" (whose pinyin is "pinyin") if `is_pattern_partial` is `true`.
+    #[builder(default = false)]
+    is_pattern_partial: bool,
+
+    /// Only matches if the haystack starts with the pattern.
+    #[builder(default = false)]
+    starts_with: bool,
+    /// Only matches if the haystack ends with the pattern.
+    #[builder(default = false)]
+    ends_with: bool,
+
+    /// `None` means not to match characters in the pattern as plain characters, i.e. match them only as pinyin/romaji, even if they are not valid pinyin/romaji characters.
+    ///
+    /// Note empty pattern always match everything.
+    #[builder(required, default = Some(PlainMatchConfig::builder().build()))]
+    plain: Option<PlainMatchConfig>,
+    /// Allow to match a haystack with mixed languages, i.e. pinyin and romaji, at the same time.
+    ///
+    /// `true` may lead to unexpected matches, especially if [`PinyinNotation::AsciiFirstLetter`] is enabled, and also lower performance.
+    #[builder(default = false)]
+    mix_lang: bool,
+    #[cfg(feature = "pinyin")]
+    pinyin: Option<PinyinMatchConfig<'a>>,
+    #[cfg(feature = "romaji")]
+    romaji: Option<RomajiMatchConfig<'a>>,
+}
+
+impl<'a> MatchConfig<'a> {
+    pub fn shallow_clone(&'a self) -> Self {
+        Self {
+            analyze: self.analyze,
+            analyze_config: self.analyze_config.clone(),
+            is_pattern_partial: self.is_pattern_partial,
+            starts_with: self.starts_with,
+            ends_with: self.ends_with,
+            plain: self.plain.clone(),
+            mix_lang: self.mix_lang,
+            pinyin: self.pinyin.as_ref().map(|c| c.shallow_clone()),
+            romaji: self.romaji.as_ref().map(|c| c.shallow_clone()),
+        }
+    }
+}
 
 struct PatternChar<'a> {
     c: char,
@@ -98,6 +150,29 @@ impl<'a, HaystackStr> IbMatcher<'a, HaystackStr>
 where
     HaystackStr: EncodedStr + ?Sized,
 {
+    pub fn with_config<'p>(
+        pattern: impl Into<Pattern<'p, HaystackStr>>,
+        config: MatchConfig<'a>,
+    ) -> Self
+    where
+        HaystackStr: 'p,
+    {
+        let pattern = pattern.into();
+        let builder = IbMatcher::builder(pattern)
+            .analyze(config.analyze)
+            .maybe_analyze_config(config.analyze_config)
+            .is_pattern_partial(config.is_pattern_partial)
+            .starts_with(config.starts_with)
+            .ends_with(config.ends_with)
+            .plain(config.plain)
+            .mix_lang(config.mix_lang);
+        #[cfg(feature = "pinyin")]
+        let builder = builder.maybe_pinyin(config.pinyin);
+        #[cfg(feature = "romaji")]
+        let builder = builder.maybe_romaji(config.romaji);
+        builder.build()
+    }
+
     // state_mod(vis = "pub(crate)")
     #[builder]
     pub fn new<'p>(

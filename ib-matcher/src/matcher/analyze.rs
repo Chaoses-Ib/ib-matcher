@@ -10,7 +10,7 @@ use crate::{
     pinyin::PinyinNotation,
 };
 
-#[derive(Builder)]
+#[derive(Builder, Clone)]
 pub struct PatternAnalyzeConfig {
     /// For better [`PatternAnalyzer::used_notations`] and [`PatternAnalyzer::min_haystack_len`].
     ///
