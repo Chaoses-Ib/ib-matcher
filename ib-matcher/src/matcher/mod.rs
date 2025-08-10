@@ -343,6 +343,22 @@ where
     where
         HaystackStr: 'h,
     {
+        self.test_and_try_for_each(input, &mut Some)
+    }
+
+    /// This routine tests if this pattern matches the haystack at the start, and if found, calls `f`, and returns a [`T`] if it returns `Some`.
+    ///
+    /// ## Arguments
+    /// - `f`: The [`Match`] provides access to both the byte offsets of the match and [`Match::is_pattern_partial()`].
+    ///   - `Match.start()` is guaranteed to be 0.
+    pub fn test_and_try_for_each<'h, T>(
+        &self,
+        input: impl Into<Input<'h, HaystackStr>>,
+        f: &mut impl FnMut(Match) -> Option<T>,
+    ) -> Option<T>
+    where
+        HaystackStr: 'h,
+    {
         let input = input.into();
         let haystack = input.haystack;
         if self.is_haystack_too_short(haystack) || self.starts_with && input.no_start {
@@ -353,20 +369,35 @@ where
                     start: 0,
                     end: 0,
                     is_pattern_partial: false,
-                });
+                })
+                .and_then(f);
             }
         }
 
         if haystack.is_ascii() {
-            return self.ascii.test(haystack.as_bytes()).div(HaystackStr::CHAR);
+            return self
+                .ascii
+                .test(haystack.as_bytes())
+                .div(HaystackStr::CHAR)
+                .and_then(f);
         }
 
-        self.sub_test::<0xFF>(&self.pattern, haystack, 0)
-            .map(|submatch| Match {
+        self.sub_test_and_try_for_each::<0xFF, T>(&self.pattern, haystack, 0, &mut |submatch| {
+            f(Match {
                 start: 0,
                 end: submatch.len,
                 is_pattern_partial: submatch.is_pattern_partial,
             })
+        })
+    }
+
+    fn sub_test<const LANG: u8>(
+        &self,
+        pattern: &[PatternChar],
+        haystack: &HaystackStr,
+        matched_len: usize,
+    ) -> Option<SubMatch> {
+        self.sub_test_and_try_for_each::<LANG, SubMatch>(pattern, haystack, matched_len, &mut Some)
     }
 
     /// ## Arguments
@@ -374,12 +405,15 @@ where
     /// - `pattern`: Not empty.
     /// - `haystack`
     /// - `matched_len`: For tail-call optimization.
-    fn sub_test<const LANG: u8>(
+    /// - `f`
+    ///   - TODO: Use coroutine when stable
+    fn sub_test_and_try_for_each<const LANG: u8, T>(
         &self,
         pattern: &[PatternChar],
         haystack: &HaystackStr,
         matched_len: usize,
-    ) -> Option<SubMatch> {
+        f: &mut impl FnMut(SubMatch) -> Option<T>,
+    ) -> Option<T> {
         debug_assert!(!pattern.is_empty());
 
         // if Self::is_haystack_too_short_with_pattern(pattern, haystack) {
@@ -410,8 +444,14 @@ where
                 return if pattern_next.is_empty() {
                     Some(SubMatch::new(matched_len_next, false))
                         .filter(|_| !self.ends_with || haystack_next.as_bytes().is_empty())
+                        .and_then(f)
                 } else {
-                    self.sub_test::<0xFF>(pattern_next, haystack_next, matched_len_next)
+                    self.sub_test_and_try_for_each::<0xFF, T>(
+                        pattern_next,
+                        haystack_next,
+                        matched_len_next,
+                        f,
+                    )
                 };
             }
         }
@@ -439,11 +479,12 @@ where
                 unsafe { str::from_utf8_unchecked(haystack.as_bytes()) },
                 |len, romaji| {
                     let match_len_next = matched_len + len;
-                    match self.sub_test_pinyin::<2>(
+                    match self.sub_test_pinyin::<2, T>(
                         pattern,
                         unsafe { haystack.get_unchecked_from(len..) },
                         match_len_next,
                         romaji,
+                        f,
                     ) {
                         (true, Some(submatch)) => return Some(submatch),
                         (true, None) => (),
@@ -489,11 +530,12 @@ where
                     .get_pinyins_and_try_for_each(haystack_c, |pinyin| {
                         for &notation in matcher.notations_prefix_group.iter() {
                             let pinyin = pinyin.notation(notation).unwrap();
-                            match self.sub_test_pinyin::<1>(
+                            match self.sub_test_pinyin::<1, T>(
                                 pattern,
                                 haystack_next,
                                 matched_len_next,
                                 pinyin,
+                                f,
                             ) {
                                 (true, Some(submatch)) => return Some(submatch),
                                 (true, None) => (),
@@ -503,11 +545,12 @@ where
                         }
                         for &notation in matcher.notations.iter() {
                             let pinyin = pinyin.notation(notation).unwrap();
-                            match self.sub_test_pinyin::<1>(
+                            match self.sub_test_pinyin::<1, T>(
                                 pattern,
                                 haystack_next,
                                 matched_len_next,
                                 pinyin,
+                                f,
                             ) {
                                 (true, Some(submatch)) => return Some(submatch),
                                 (true, None) => (),
@@ -533,13 +576,14 @@ where
     ///
     /// ## Returns
     /// (pinyin_matched, submatch)
-    fn sub_test_pinyin<const LANG: u8>(
+    fn sub_test_pinyin<const LANG: u8, T>(
         &self,
         pattern: &[PatternChar],
         haystack_next: &HaystackStr,
         matched_len_next: usize,
         pinyin: &str,
-    ) -> (bool, Option<SubMatch>) {
+        f: &mut impl FnMut(SubMatch) -> Option<T>,
+    ) -> (bool, Option<T>) {
         debug_assert!(!pattern.is_empty());
         debug_assert_eq!(pinyin, pinyin.to_lowercase());
 
@@ -574,7 +618,8 @@ where
                 return (
                     true,
                     Some(SubMatch::new(matched_len_next, true))
-                        .filter(|_| !self.ends_with || haystack_next.as_bytes().is_empty()),
+                        .filter(|_| !self.ends_with || haystack_next.as_bytes().is_empty())
+                        .and_then(f),
                 );
             }
         } else if pattern_s.starts_with(pinyin) {
@@ -582,19 +627,21 @@ where
                 return (
                     true,
                     Some(SubMatch::new(matched_len_next, false))
-                        .filter(|_| !self.ends_with || haystack_next.as_bytes().is_empty()),
+                        .filter(|_| !self.ends_with || haystack_next.as_bytes().is_empty())
+                        .and_then(f),
                 );
             }
 
             if let Some(submatch) = if self.mix_lang {
-                Self::sub_test::<0xFF>
+                Self::sub_test_and_try_for_each::<0xFF, T>
             } else {
-                Self::sub_test::<LANG>
+                Self::sub_test_and_try_for_each::<LANG, T>
             }(
                 self,
                 &pattern[pinyin.chars().count()..],
                 haystack_next,
                 matched_len_next,
+                f,
             ) {
                 return (true, Some(submatch));
             }
