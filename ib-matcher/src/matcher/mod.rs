@@ -1,4 +1,4 @@
-use std::marker::PhantomData;
+use std::{fmt::Debug, marker::PhantomData};
 
 use bon::bon;
 
@@ -79,6 +79,18 @@ where
     romaji: Option<RomajiMatcher<'a>>,
 
     _haystack_str: PhantomData<HaystackStr>,
+}
+
+impl Debug for IbMatcher<'_, str> {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("IbMatcher")
+            .field("pattern", &self._pattern_string)
+            .field("starts_with", &self.starts_with)
+            .field("ends_with", &self.ends_with)
+            .field("plain", &self.plain)
+            .field("mix_lang", &self.mix_lang)
+            .finish()
+    }
 }
 
 #[bon]

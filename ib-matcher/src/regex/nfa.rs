@@ -6,6 +6,8 @@ use itertools::Itertools;
 use regex_automata::nfa::thompson::BuildError;
 use regex_automata::{nfa::thompson, util::primitives::StateID};
 
+use crate::matcher::IbMatcher;
+
 /// A byte oriented Thompson non-deterministic finite automaton (NFA).
 ///
 /// A Thompson NFA is a finite state machine that permits unconditional epsilon
@@ -392,13 +394,114 @@ pub(super) struct Inner {
 /// be aware of this type at all. The main use cases for looking at `State`s
 /// directly are if you need to write your own search implementation or if you
 /// need to do some kind of analysis on the NFA.
-#[derive(Clone, Eq, PartialEq, Debug)]
+// Clone, Eq, PartialEq
+#[derive(Debug)]
 pub enum State {
     Nfa(thompson::State),
+    IbMatcher { matcher: IbMatcher<'static>, next: StateID },
 }
 
 impl From<thompson::State> for State {
     fn from(state: thompson::State) -> Self {
         State::Nfa(state)
+    }
+}
+
+impl NFA {
+    pub fn states_mut(&mut self) -> &mut Vec<State> {
+        &mut Arc::get_mut(&mut self.0).unwrap().states
+    }
+
+    #[cfg(test)]
+    pub(crate) fn patch_first_byte_to_matcher(
+        &mut self,
+        byte: u8,
+        matcher: IbMatcher<'static>,
+    ) {
+        for s in self.states_mut() {
+            match *s {
+                State::Nfa(thompson::State::ByteRange {
+                    trans: thompson::Transition { start, end, next },
+                }) if start == byte && end == byte => {
+                    *s = State::IbMatcher { matcher, next };
+                    break;
+                }
+                _ => (),
+            }
+        }
+    }
+
+    pub(crate) fn patch_bytes_to_matchers(
+        &mut self,
+        mut matcher: impl FnMut(u8) -> IbMatcher<'static>,
+    ) {
+        for s in self.states_mut() {
+            match *s {
+                State::Nfa(thompson::State::ByteRange {
+                    trans: thompson::Transition { start, end, next },
+                }) if start == end => {
+                    *s = State::IbMatcher { matcher: matcher(start), next };
+                }
+                _ => (),
+            }
+        }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use regex_automata::Match;
+
+    use crate::{
+        matcher::PinyinMatchConfig,
+        pinyin::PinyinNotation,
+        regex::{backtrack::BoundedBacktracker, syntax},
+    };
+
+    use super::*;
+
+    #[test]
+    fn patch_first_byte() {
+        let mut nfa = NFA::new("pyss").unwrap();
+        dbg!(&nfa);
+
+        nfa.patch_first_byte_to_matcher(
+            b'p',
+            IbMatcher::builder("p")
+                .pinyin(PinyinMatchConfig::notations(
+                    PinyinNotation::Ascii | PinyinNotation::AsciiFirstLetter,
+                ))
+                .build(),
+        );
+        dbg!(&nfa);
+
+        let re = BoundedBacktracker::new_from_nfa(nfa).unwrap();
+        let mut cache = re.create_cache();
+        assert_eq!(
+            re.try_find(&mut cache, "拼yss").unwrap(),
+            Some(Match::must(0, 0..6)),
+        );
+    }
+
+    #[test]
+    fn patch_bytes() {
+        let (hir, literals) =
+            syntax::fold::parse_and_fold_literal_str("pyss").unwrap();
+        let mut nfa: NFA =
+            thompson::Compiler::new().build_from_hir(&hir).unwrap().into();
+        nfa.patch_bytes_to_matchers(|b| {
+            IbMatcher::builder(literals[b as usize].as_str())
+                .pinyin(PinyinMatchConfig::notations(
+                    PinyinNotation::Ascii | PinyinNotation::AsciiFirstLetter,
+                ))
+                .build()
+        });
+        dbg!(&nfa);
+        let re = BoundedBacktracker::new_from_nfa(nfa).unwrap();
+        let mut cache = re.create_cache();
+        assert_eq!(
+            re.try_find(&mut cache, "拼音搜索").unwrap(),
+            Some(Match::must(0, 0..12)),
+        );
     }
 }

@@ -1559,6 +1559,15 @@ impl BoundedBacktracker {
                         return Some(HalfMatch::new(pattern_id, at));
                     }
                 },
+                super::State::IbMatcher { ref matcher, next } => {
+                    let haystack =
+                        unsafe { str::from_utf8_unchecked(input.haystack()) };
+                    // TODO: test_and_try_for_each
+                    if let Some(m) = matcher.test(&haystack[at..]) {
+                        sid = next;
+                        at += m.len();
+                    }
+                }
             }
         }
     }

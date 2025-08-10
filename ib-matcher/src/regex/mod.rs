@@ -8,6 +8,8 @@
 #[cfg(not(doctest))]
 pub mod backtrack;
 mod nfa;
+#[cfg(feature = "regex-syntax")]
+pub mod syntax;
 mod util;
 
 pub use nfa::{State, NFA};

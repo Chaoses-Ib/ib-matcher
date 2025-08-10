@@ -42,7 +42,7 @@ pub mod matcher;
 pub mod minimal;
 #[cfg(feature = "pinyin")]
 pub mod pinyin;
-#[cfg(feature = "regex")]
+#[cfg(any(feature = "regex-automata", feature = "regex-syntax"))]
 pub mod regex;
 #[cfg(feature = "syntax")]
 pub mod syntax;
