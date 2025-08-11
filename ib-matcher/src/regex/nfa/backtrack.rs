@@ -1562,10 +1562,31 @@ impl BoundedBacktracker {
                 super::State::IbMatcher { ref matcher, next } => {
                     let haystack =
                         unsafe { str::from_utf8_unchecked(input.haystack()) };
-                    // TODO: test_and_try_for_each
-                    if let Some(m) = matcher.test(&haystack[at..]) {
-                        sid = next;
-                        at += m.len();
+                    // `ceil_char_boundary()` is faster, but doesn't suit backtracker well
+                    if !haystack.is_char_boundary(at) {
+                        return None;
+                    }
+
+                    // if let Some(m) = matcher.test(&haystack[at..]) {
+                    //     sid = next;
+                    //     at += m.len();
+                    // }
+                    let mut first = true;
+                    matcher.test_and_try_for_each(&haystack[at..], &mut |m| {
+                        if first {
+                            first = false;
+                            sid = next;
+                            at += m.end();
+                        } else {
+                            cache.stack.push(Frame::Step {
+                                sid: next,
+                                at: at + m.end(),
+                            });
+                        }
+                        None::<()>
+                    });
+                    if first {
+                        return None;
                     }
                 }
             }

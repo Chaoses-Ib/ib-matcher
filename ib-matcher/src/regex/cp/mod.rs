@@ -1,0 +1,12 @@
+//! ## Design
+//! A copy-and-patch NFA.
+//!
+//! To reduce binary size and maintenance cost, we do not copy the entire `regex_automata` crate, but only the backtrack engine and add a wrapper around `NFA`. The [`NFA`](crate::regex::nfa::NFA) wrapper allows us to inject our own [`State`](crate::regex::nfa::State) variants and copy-and-patch the compiled states.
+//!
+//! The backtrack engine is forked from [`regex_automata::nfa::thompson::backtrack`](https://docs.rs/regex-automata/0.4.9/regex_automata/nfa/thompson/backtrack/index.html).
+mod regex;
+
+pub use regex::{
+    BuildError, Builder, Cache, Config, Regex, TryCapturesMatches,
+    TryFindMatches,
+};

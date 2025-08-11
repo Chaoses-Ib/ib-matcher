@@ -70,6 +70,12 @@ pub struct MatchConfig<'a> {
     romaji: Option<RomajiMatchConfig<'a>>,
 }
 
+impl Default for MatchConfig<'_> {
+    fn default() -> Self {
+        Self::builder().build()
+    }
+}
+
 impl<'a> MatchConfig<'a> {
     pub fn shallow_clone(&'a self) -> Self {
         Self {

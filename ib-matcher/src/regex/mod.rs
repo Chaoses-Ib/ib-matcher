@@ -5,6 +5,7 @@
 //!
 //! The backtrack engine is forked from [`regex_automata::nfa::thompson::backtrack`](https://docs.rs/regex-automata/0.4.9/regex_automata/nfa/thompson/backtrack/index.html).
 
+pub mod cp;
 pub mod nfa;
 #[cfg(feature = "regex-syntax")]
 pub mod syntax;
