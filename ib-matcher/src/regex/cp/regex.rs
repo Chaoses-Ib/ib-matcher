@@ -7,6 +7,8 @@ use std::{
 };
 
 use bon::bon;
+use itertools::Itertools;
+use regex_syntax::hir::Hir;
 
 use crate::{
     matcher::{IbMatcher, MatchConfig},
@@ -209,10 +211,92 @@ impl<'a> Regex<'a> {
         thompson::Config::new()
     }
 
-    #[builder(builder_type = Builder)]
+    /// Return a builder for configuring the construction of a `Regex`.
+    ///
+    /// This is a convenience routine to avoid needing to import the
+    /// [`Builder`] type in common cases.
+    ///
+    /// # Example: change the line terminator
+    ///
+    /// This example shows how to enable multi-line mode by default and change
+    /// the line terminator to the NUL byte:
+    ///
+    /// ```
+    /// use ib_matcher::regex::{cp::Regex, util::{syntax, look::LookMatcher}, Match};
+    ///
+    /// let mut lookm = LookMatcher::new();
+    /// lookm.set_line_terminator(b'\x00');
+    /// let re = Regex::builder()
+    ///     .syntax(syntax::Config::new().multi_line(true))
+    ///     .configure(Regex::config().look_matcher(lookm))
+    ///     .build(r"^foo$")?;
+    /// let hay = "\x00foo\x00";
+    /// assert_eq!(Some(Match::must(0, 1..4)), re.find(hay));
+    ///
+    /// # Ok::<(), Box<dyn std::error::Error>>(())
+    /// ```
+    #[builder(builder_type = Builder, finish_fn(name = build_many_from_hir, doc {
+    /// Builds a `Regex` directly from many `Hir` expressions.
+    ///
+    /// This is useful if you needed to parse pattern strings into `Hir`
+    /// expressions for other reasons (such as analysis or transformations).
+    /// This routine permits building a `Regex` directly from the `Hir`
+    /// expressions instead of first converting the `Hir` expressions back to
+    /// pattern strings.
+    ///
+    /// When using this method, any options set via [`Builder::syntax`] are
+    /// ignored. Namely, the syntax options only apply when parsing a pattern
+    /// string, which isn't relevant here.
+    ///
+    /// If there was a problem building the underlying regex matcher for the
+    /// given `Hir` expressions, then an error is returned.
+    ///
+    /// Note that unlike [`Builder::build_many`], this can only fail as a
+    /// result of building the underlying matcher. In that case, there is
+    /// no single `Hir` expression that can be isolated as a reason for the
+    /// failure. So if this routine fails, it's not possible to determine which
+    /// `Hir` expression caused the failure.
+    ///
+    /// # Example
+    ///
+    /// This example shows how one can hand-construct multiple `Hir`
+    /// expressions and build a single regex from them without doing any
+    /// parsing at all.
+    ///
+    /// ```
+    /// use ib_matcher::regex::{
+    ///     cp::Regex, Match,
+    ///     syntax::hir::{Hir, Look},
+    /// };
+    ///
+    /// // (?Rm)^foo$
+    /// let hir1 = Hir::concat(vec![
+    ///     Hir::look(Look::StartCRLF),
+    ///     Hir::literal("foo".as_bytes()),
+    ///     Hir::look(Look::EndCRLF),
+    /// ]);
+    /// // (?Rm)^bar$
+    /// let hir2 = Hir::concat(vec![
+    ///     Hir::look(Look::StartCRLF),
+    ///     Hir::literal("bar".as_bytes()),
+    ///     Hir::look(Look::EndCRLF),
+    /// ]);
+    /// let re = Regex::builder()
+    ///     .build_many_from_hir(vec![hir1, hir2])?;
+    /// let hay = "\r\nfoo\r\nbar";
+    /// let got: Vec<Match> = re.find_iter(hay).collect();
+    /// let expected = vec![
+    ///     Match::must(0, 2..5),
+    ///     Match::must(1, 7..10),
+    /// ];
+    /// assert_eq!(expected, got);
+    ///
+    /// Ok::<(), Box<dyn std::error::Error>>(())
+    /// ```
+    }))]
     pub fn builder(
-        #[builder(finish_fn)] pattern: &str,
-        #[builder(default)] syntax: util::syntax::Config,
+        #[builder(field)] syntax: util::syntax::Config,
+        #[builder(finish_fn)] hirs: Vec<Hir>,
         /// Thompson NFA config. Named `configure` to be compatible with [`regex_automata::meta::Builder`]. Although some fields are not supported and `utf8_empty` is named as `utf8` instead.
         #[builder(default)]
         configure: thompson::Config,
@@ -222,17 +306,9 @@ impl<'a> Regex<'a> {
         #[builder(default = backtrack::Config::new().visited_capacity(usize::MAX / 8))]
         backtrack: backtrack::Config,
     ) -> Result<Self, BuildError> {
-        // Parse
-        let hir = regex_automata::util::syntax::parse_with(pattern, &syntax)
-            .map_err(|_| {
-            // Shit
-            thompson::Compiler::new()
-                .syntax(syntax)
-                .build(pattern)
-                .unwrap_err()
-        })?;
+        _ = syntax;
         #[cfg(test)]
-        dbg!(&hir);
+        dbg!(&hirs);
 
         let mut imp = Arc::new(RegexI {
             re: MaybeUninit::uninit(),
@@ -241,10 +317,11 @@ impl<'a> Regex<'a> {
         });
 
         // Copy-and-patch NFA
-        let (hir, literals) = syntax::fold::fold_literal_utf8(hir);
+        let (hirs, literals) =
+            syntax::fold::fold_literal_utf8(hirs.into_iter());
         let mut nfa: NFA = thompson::Compiler::new()
             .configure(configure)
-            .build_from_hir(&hir)?
+            .build_many_from_hir(&hirs)?
             .into();
         nfa.patch_bytes_to_matchers(|b| {
             // `shallow_clone()` requires `config` cannot be moved
@@ -262,6 +339,171 @@ impl<'a> Regex<'a> {
         unsafe { Arc::get_mut(&mut imp).unwrap_unchecked().re.write(re) };
 
         Ok(Self { imp, pool: Pool::new(create_cache) })
+    }
+}
+
+impl<'a, S: builder::State> Builder<'a, S> {
+    /// Configure the syntax options when parsing a pattern string while
+    /// building a `Regex`.
+    ///
+    /// These options _only_ apply when [`Builder::build`] or [`Builder::build_many`]
+    /// are used. The other build methods accept `Hir` values, which have
+    /// already been parsed.
+    ///
+    /// # Example
+    ///
+    /// This example shows how to enable case insensitive mode.
+    ///
+    /// ```
+    /// use ib_matcher::regex::{cp::Regex, util::syntax, Match};
+    ///
+    /// let re = Regex::builder()
+    ///     .syntax(syntax::Config::new().case_insensitive(true))
+    ///     .build(r"δ")?;
+    /// assert_eq!(Some(Match::must(0, 0..2)), re.find(r"Δ"));
+    ///
+    /// Ok::<(), Box<dyn std::error::Error>>(())
+    /// ```
+    pub fn syntax(mut self, syntax: util::syntax::Config) -> Self {
+        self.syntax = syntax;
+        self
+    }
+
+    /// Builds a `Regex` from a single pattern string.
+    ///
+    /// If there was a problem parsing the pattern or a problem turning it into
+    /// a regex matcher, then an error is returned.
+    ///
+    /// # Example
+    ///
+    /// This example shows how to configure syntax options.
+    ///
+    /// ```
+    /// use ib_matcher::regex::{cp::Regex, util::syntax, Match};
+    ///
+    /// let re = Regex::builder()
+    ///     .syntax(syntax::Config::new().crlf(true).multi_line(true))
+    ///     .build(r"^foo$")?;
+    /// let hay = "\r\nfoo\r\n";
+    /// assert_eq!(Some(Match::must(0, 2..5)), re.find(hay));
+    ///
+    /// # Ok::<(), Box<dyn std::error::Error>>(())
+    /// ```
+    pub fn build(self, pattern: &str) -> Result<Regex<'a>, BuildError>
+    where
+        S: builder::IsComplete,
+    {
+        self.build_many(&[pattern])
+    }
+
+    /// Builds a `Regex` from many pattern strings.
+    ///
+    /// If there was a problem parsing any of the patterns or a problem turning
+    /// them into a regex matcher, then an error is returned.
+    ///
+    /// # Example: zero patterns is valid
+    ///
+    /// Building a regex with zero patterns results in a regex that never
+    /// matches anything. Because this routine is generic, passing an empty
+    /// slice usually requires a turbo-fish (or something else to help type
+    /// inference).
+    ///
+    /// ```
+    /// use ib_matcher::regex::{cp::Regex, util::syntax, Match};
+    ///
+    /// let re = Regex::builder()
+    ///     .build_many::<&str>(&[])?;
+    /// assert_eq!(None, re.find(""));
+    ///
+    /// # Ok::<(), Box<dyn std::error::Error>>(())
+    /// ```
+    pub fn build_many<P: AsRef<str>>(
+        self,
+        patterns: &[P],
+    ) -> Result<Regex<'a>, BuildError>
+    where
+        S: builder::IsComplete,
+    {
+        // Parse
+        let hirs = patterns
+            .into_iter()
+            .map(|pattern| {
+                let pattern = pattern.as_ref();
+                regex_automata::util::syntax::parse_with(pattern, &self.syntax)
+                    .map_err(|_| {
+                        // Shit
+                        thompson::Compiler::new()
+                            .syntax(self.syntax)
+                            .build(pattern)
+                            .unwrap_err()
+                    })
+            })
+            .try_collect()?;
+        self.build_many_from_hir(hirs)
+    }
+
+    /// Builds a `Regex` directly from many `Hir` expressions.
+    ///
+    /// This is useful if you needed to parse pattern strings into `Hir`
+    /// expressions for other reasons (such as analysis or transformations).
+    /// This routine permits building a `Regex` directly from the `Hir`
+    /// expressions instead of first converting the `Hir` expressions back to
+    /// pattern strings.
+    ///
+    /// When using this method, any options set via [`Builder::syntax`] are
+    /// ignored. Namely, the syntax options only apply when parsing a pattern
+    /// string, which isn't relevant here.
+    ///
+    /// If there was a problem building the underlying regex matcher for the
+    /// given `Hir` expressions, then an error is returned.
+    ///
+    /// Note that unlike [`Builder::build_many`], this can only fail as a
+    /// result of building the underlying matcher. In that case, there is
+    /// no single `Hir` expression that can be isolated as a reason for the
+    /// failure. So if this routine fails, it's not possible to determine which
+    /// `Hir` expression caused the failure.
+    ///
+    /// # Example
+    ///
+    /// This example shows how one can hand-construct multiple `Hir`
+    /// expressions and build a single regex from them without doing any
+    /// parsing at all.
+    ///
+    /// ```
+    /// use ib_matcher::regex::{
+    ///     cp::Regex, Match,
+    ///     syntax::hir::{Hir, Look},
+    /// };
+    ///
+    /// // (?Rm)^foo$
+    /// let hir1 = Hir::concat(vec![
+    ///     Hir::look(Look::StartCRLF),
+    ///     Hir::literal("foo".as_bytes()),
+    ///     Hir::look(Look::EndCRLF),
+    /// ]);
+    /// // (?Rm)^bar$
+    /// let hir2 = Hir::concat(vec![
+    ///     Hir::look(Look::StartCRLF),
+    ///     Hir::literal("bar".as_bytes()),
+    ///     Hir::look(Look::EndCRLF),
+    /// ]);
+    /// let re = Regex::builder()
+    ///     .build_many_from_hir(vec![hir1, hir2])?;
+    /// let hay = "\r\nfoo\r\nbar";
+    /// let got: Vec<Match> = re.find_iter(hay).collect();
+    /// let expected = vec![
+    ///     Match::must(0, 2..5),
+    ///     Match::must(1, 7..10),
+    /// ];
+    /// assert_eq!(expected, got);
+    ///
+    /// Ok::<(), Box<dyn std::error::Error>>(())
+    /// ```
+    pub fn build_from_hir(self, hir: Hir) -> Result<Regex<'a>, BuildError>
+    where
+        S: builder::IsComplete,
+    {
+        self.build_many_from_hir(vec![hir])
     }
 }
 

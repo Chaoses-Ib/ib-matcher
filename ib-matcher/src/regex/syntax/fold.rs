@@ -1,3 +1,5 @@
+use std::iter;
+
 use regex_syntax::{
     hir::{Hir, HirKind},
     Error,
@@ -6,29 +8,37 @@ use regex_syntax::{
 pub fn parse_and_fold_literal(
     pattern: &str,
 ) -> Result<(Hir, Vec<Box<[u8]>>), Error> {
-    Ok(fold_literal(regex_syntax::parse(pattern)?))
+    let (mut hirs, literals) =
+        fold_literal(iter::once(regex_syntax::parse(pattern)?));
+    Ok((hirs.pop().unwrap(), literals))
 }
 
 pub fn parse_and_fold_literal_utf8(
     pattern: &str,
 ) -> Result<(Hir, Vec<String>), Error> {
-    Ok(fold_literal_utf8(regex_syntax::parse(pattern)?))
+    let (mut hirs, literals) =
+        fold_literal_utf8(iter::once(regex_syntax::parse(pattern)?));
+    Ok((hirs.pop().unwrap(), literals))
 }
 
 /// Fold the first 256 literals into single byte literals.
-pub fn fold_literal(hir: Hir) -> (Hir, Vec<Box<[u8]>>) {
-    fold_literal_common(hir, Ok)
+pub fn fold_literal(
+    hirs: impl Iterator<Item = Hir>,
+) -> (Vec<Hir>, Vec<Box<[u8]>>) {
+    fold_literal_common(hirs, Ok)
 }
 
 /// Fold the first 256 UTF-8 literals into single byte literals.
-pub fn fold_literal_utf8(hir: Hir) -> (Hir, Vec<String>) {
-    fold_literal_common(hir, |b| String::from_utf8(b.to_vec()).map_err(|_| b))
+pub fn fold_literal_utf8(
+    hirs: impl Iterator<Item = Hir>,
+) -> (Vec<Hir>, Vec<String>) {
+    fold_literal_common(hirs, |b| String::from_utf8(b.to_vec()).map_err(|_| b))
 }
 
 fn fold_literal_common<T>(
-    hir: Hir,
+    hirs: impl Iterator<Item = Hir>,
     try_into: impl Fn(Box<[u8]>) -> Result<T, Box<[u8]>>,
-) -> (Hir, Vec<T>) {
+) -> (Vec<Hir>, Vec<T>) {
     fn fold_literal<T>(
         hir: Hir,
         literals: &mut Vec<T>,
@@ -95,7 +105,10 @@ fn fold_literal_common<T>(
         }
     }
     let mut literals = Vec::new();
-    (fold_literal(hir, &mut literals, &try_into), literals)
+    (
+        hirs.map(|hir| fold_literal(hir, &mut literals, &try_into)).collect(),
+        literals,
+    )
 }
 
 #[cfg(test)]
