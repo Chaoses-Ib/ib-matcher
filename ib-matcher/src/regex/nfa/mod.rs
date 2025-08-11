@@ -4,9 +4,13 @@ use std::sync::Arc;
 use itertools::Itertools;
 #[cfg(feature = "regex-syntax")]
 use regex_automata::nfa::thompson::BuildError;
-use regex_automata::{nfa::thompson, util::primitives::StateID};
+use regex_automata::util::primitives::StateID;
 
 use crate::matcher::IbMatcher;
+
+pub mod backtrack;
+
+pub use regex_automata::nfa::thompson;
 
 /// A byte oriented Thompson non-deterministic finite automaton (NFA).
 ///
@@ -455,7 +459,7 @@ mod tests {
     use crate::{
         matcher::PinyinMatchConfig,
         pinyin::PinyinNotation,
-        regex::{backtrack::BoundedBacktracker, syntax},
+        regex::{nfa::backtrack::BoundedBacktracker, syntax},
     };
 
     use super::*;

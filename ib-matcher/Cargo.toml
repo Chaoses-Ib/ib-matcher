@@ -13,7 +13,9 @@ license.workspace = true
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [features]
-default = ["perf", "romaji-compress-words", "regex-unicode"]
+default = ["std", "perf", "romaji-compress-words", "regex-unicode"]
+std = ["regex-automata?/std", "regex-syntax?/std", "alloc"]
+alloc = ["regex-automata?/alloc"]
 
 ## Chinese pinyin match support.
 pinyin = ["dep:arraystring", "dep:bitflags"]
@@ -28,8 +30,8 @@ romaji-compress-words = ["ib-romaji?/compress-words"]
 syntax = []
 
 regex = ["regex-automata", "regex-syntax"]
-regex-automata = ["dep:regex-automata"]
-regex-syntax = ["dep:regex-syntax", "regex-automata?/syntax"]
+regex-automata = ["regex-automata/nfa-thompson", "alloc"]
+regex-syntax = ["dep:regex-syntax", "regex-automata?/syntax", "alloc"]
 ## Enables all regex Unicode features. This feature is enabled by default, and will
 ## always cover all Unicode features, even if more are added in the future.
 regex-unicode = ["regex-automata?/unicode", "regex-syntax?/unicode"]
@@ -73,14 +75,8 @@ regex = { version = "1.10.2", default-features = false, features = [
     "std",
     "perf",
 ], optional = true }
-# TODO: perf, unicode
-regex-automata = { version = "0.4", default-features = false, features = [
-    "nfa-thompson",
-    "std",
-], optional = true }
-regex-syntax = { version = "0.8.5", default-features = false, features = [
-    "std",
-], optional = true }
+regex-automata = { version = "0.4", default-features = false, optional = true }
+regex-syntax = { version = "0.8", default-features = false, optional = true }
 widestring = { version = "1.0.2", optional = true }
 
 [dev-dependencies]

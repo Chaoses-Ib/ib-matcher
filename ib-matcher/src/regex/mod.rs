@@ -5,10 +5,14 @@
 //!
 //! The backtrack engine is forked from [`regex_automata::nfa::thompson::backtrack`](https://docs.rs/regex-automata/0.4.9/regex_automata/nfa/thompson/backtrack/index.html).
 
-pub mod backtrack;
-mod nfa;
+pub mod nfa;
 #[cfg(feature = "regex-syntax")]
 pub mod syntax;
-mod util;
+pub mod util;
 
-pub use nfa::{State, NFA};
+pub use regex_automata::{
+    Anchored, HalfMatch, Input, Match, MatchError, MatchErrorKind, MatchKind,
+    PatternID, Span,
+};
+#[cfg(feature = "alloc")]
+pub use regex_automata::{PatternSet, PatternSetInsertError, PatternSetIter};
