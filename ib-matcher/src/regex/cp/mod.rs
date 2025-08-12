@@ -1,3 +1,5 @@
+//! The primary type in this module is [`Regex`].
+//!
 //! ## Design
 //! A copy-and-patch NFA.
 //!

@@ -3,9 +3,28 @@
 [![Documentation](https://docs.rs/ib-matcher/badge.svg)](https://docs.rs/ib-matcher)
 [![License](https://img.shields.io/crates/l/ib-matcher.svg)](LICENSE.txt)
 
-A multilingual and fast string matcher, supports 拼音匹配 (Chinese pinyin match) and ローマ字検索 (Japanese romaji match).
+A multilingual and fast string and regex matcher, supports 拼音匹配 (Chinese pinyin match) and ローマ字検索 (Japanese romaji match).
 
-Usage:
+## Features
+- Unicode support
+  - Fully UTF-8 support and limited support for UTF-16 and UTF-32.
+  - Unicode case insensitivity.
+- [Chinese pinyin](https://en.wikipedia.org/wiki/Pinyin) matching (拼音匹配)
+  - Support characters with multiple readings (i.e. heteronyms, 多音字).
+  - Support multiple pinyin notations, including [Quanpin (全拼)](https://zh.wikipedia.org/wiki/全拼), [Jianpin (简拼)](https://zh.wikipedia.org/wiki/简拼) and many [Shuangpin (双拼)](https://zh.wikipedia.org/wiki/%E5%8F%8C%E6%8B%BC) notations.
+  - Support mixing multiple notations during matching.
+- [Japanese romaji](https://en.wikipedia.org/wiki/Romanization_of_Japanese) matching (ローマ字検索)
+  - Support characters with multiple readings (i.e. heteronyms, 同形異音語).
+  - Support [Hepburn romanization system](https://en.wikipedia.org/wiki/Hepburn_romanization) only at the moment.
+- [Regular expression](https://en.wikipedia.org/wiki/Regular_expression)
+  - Support the same syntax as [`regex`](https://docs.rs/regex/), including wildcards, repetitions, alternations, groups, etc.
+- Relatively high performance
+
+And all of the above features are optional. You don't need to pay the performance and binary size cost for features you don't use.
+
+You can also use [ib-pinyin](#ib-pinyin) if you only need Chinese pinyin match, which is simpler and more stable.
+
+## Usage
 ```rust
 //! cargo add ib-matcher --features pinyin,romaji
 use ib_matcher::{
@@ -27,7 +46,43 @@ let matcher = IbMatcher::builder("konosuba")
 assert!(matcher.is_match("この素晴らしい世界に祝福を"));
 ```
 
-You can also use [ib-pinyin](#ib-pinyin) if you only need Chinese pinyin match, which is simpler and more stable.
+## Regular expression
+See [`regex` module](https://docs.rs/ib-matcher/latest/ib_matcher/regex/) for more details. For example:
+```rust
+// cargo add ib-matcher --features regex,pinyin,romaji
+use ib_matcher::{
+    matcher::{MatchConfig, PinyinMatchConfig, RomajiMatchConfig},
+    regex::{cp::Regex, Match},
+};
+
+let config = MatchConfig::builder()
+    .pinyin(PinyinMatchConfig::default())
+    .romaji(RomajiMatchConfig::default())
+    .build();
+
+let re = Regex::builder()
+    .ib(config.shallow_clone())
+    .build("raki.suta")
+    .unwrap();
+assert_eq!(re.find("「らき☆すた」"), Some(Match::must(0, 3..18)));
+
+let re = Regex::builder()
+    .ib(config.shallow_clone())
+    .build("pysou.*?(any|every)thing")
+    .unwrap();
+assert_eq!(re.find("拼音搜索Everything"), Some(Match::must(0, 0..22)));
+
+let config = MatchConfig::builder()
+    .pinyin(PinyinMatchConfig::default())
+    .romaji(RomajiMatchConfig::default())
+    .mix_lang(true)
+    .build();
+let re = Regex::builder()
+    .ib(config.shallow_clone())
+    .build("(?x)^zangsounofuri-?ren # Mixing pinyin and romaji")
+    .unwrap();
+assert_eq!(re.find("葬送のフリーレン"), Some(Match::must(0, 0..24)));
+```
 
 ## [ib-pinyin](ib-pinyin/README.md)
 一个高性能 Rust 拼音查询、匹配库。
@@ -115,7 +170,7 @@ Unicode utils.
 ## 其它拼音相关项目
 语言 | 库 | 拼音 | 双拼 | 词典 | 匹配 | 其它
 --- | --- | --- | --- | --- | --- | ---
-Rust <br /> (C, AHK2) | ib-matcher/ib-pinyin | ✔️ Unicode | ✔️ | ❌ | ✔️ | 支持日文；性能优先；支持 Unicode 辅助平面汉字
+Rust <br /> (C, AHK2) | ib-matcher/ib-pinyin | ✔️ Unicode | ✔️ | ❌ | ✔️ | 支持日文；支持正则表达式；性能优先；支持 Unicode 辅助平面汉字
 Rust <br /> ([Node.js](https://github.com/Brooooooklyn/pinyin)) | [rust-pinyin](https://github.com/mozillazg/rust-pinyin) | ✔️ Unicode | ❌ | ❌ | ❌
 Rust | [rust-pinyin](https://github.com/samlink/rust_pinyin) | 简拼 | ❌ | ❌ | ❌
 C# | [ToolGood.Words.Pinyin](https://github.com/toolgood/ToolGood.Words.Pinyin) | ✔️ | ❌ | ❌ | 单编码？

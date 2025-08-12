@@ -29,6 +29,41 @@ pub use crate::regex::nfa::{
     thompson::BuildError,
 };
 
+/// A compiled regular expression for searching Unicode haystacks.
+///
+/// A `Regex` can be used to search haystacks, split haystacks into substrings
+/// or replace substrings in a haystack with a different substring. All
+/// searching is done with an implicit `(?s:.)*?` at the beginning and end of
+/// an pattern. To force an expression to match the whole string (or a prefix
+/// or a suffix), you can use anchored search or an anchor like `^` or `$` (or `\A` and `\z`).
+/**
+# Overview
+
+The most important methods are as follows:
+
+* [`Regex::new`] compiles a regex using the default configuration. A
+[`Builder`] permits setting a non-default configuration. (For example,
+case insensitive matching, verbose mode and others.)
+* [`Regex::is_match`] reports whether a match exists in a particular haystack.
+* [`Regex::find`] reports the byte offsets of a match in a haystack, if one
+exists. [`Regex::find_iter`] returns an iterator over all such matches.
+* [`Regex::captures`] returns a [`Captures`], which reports both the byte
+offsets of a match in a haystack and the byte offsets of each matching capture
+group from the regex in the haystack.
+[`Regex::captures_iter`] returns an iterator over all such matches.
+*/
+/// # Example
+///
+/// ```
+/// use ib_matcher::regex::cp::Regex;
+///
+/// let re = Regex::new(r"^[0-9]{4}-[0-9]{2}-[0-9]{2}$")?;
+/// assert!(re.is_match("2010-03-14"));
+///
+/// # Ok::<(), Box<dyn std::error::Error>>(())
+/// ```
+/// For more examples and the syntax, see [`crate::regex`].
+///
 /// # Case insensitivity
 /// To enable case insensitivity:
 /// ```
@@ -100,93 +135,6 @@ pub use crate::regex::nfa::{
 /// If one wants to avoid the use of spin-locks when the `std` feature is
 /// disabled, then you must use APIs that accept a `Cache` value explicitly.
 /// For example, [`Regex::try_find`].
-///
-/// # Example
-///
-/// ```
-/// use ib_matcher::regex::cp::Regex;
-///
-/// let re = Regex::new(r"^[0-9]{4}-[0-9]{2}-[0-9]{2}$")?;
-/// assert!(re.is_match("2010-03-14"));
-///
-/// # Ok::<(), Box<dyn std::error::Error>>(())
-/// ```
-///
-/// # Example: anchored search
-///
-/// This example shows how to use [`Input::anchored`] to run an anchored
-/// search, even when the regex pattern itself isn't anchored. An anchored
-/// search guarantees that if a match is found, then the start offset of the
-/// match corresponds to the offset at which the search was started.
-///
-/// ```
-/// use ib_matcher::regex::{cp::Regex, Anchored, Input, Match};
-///
-/// let re = Regex::new(r"\bfoo\b")?;
-/// let input = Input::new("xx foo xx").range(3..).anchored(Anchored::Yes);
-/// // The offsets are in terms of the original haystack.
-/// assert_eq!(Some(Match::must(0, 3..6)), re.find(input));
-///
-/// // Notice that no match occurs here, because \b still takes the
-/// // surrounding context into account, even if it means looking back
-/// // before the start of your search.
-/// let hay = "xxfoo xx";
-/// let input = Input::new(hay).range(2..).anchored(Anchored::Yes);
-/// assert_eq!(None, re.find(input));
-/// // Indeed, you cannot achieve the above by simply slicing the
-/// // haystack itself, since the regex engine can't see the
-/// // surrounding context. This is why 'Input' permits setting
-/// // the bounds of a search!
-/// let input = Input::new(&hay[2..]).anchored(Anchored::Yes);
-/// // WRONG!
-/// assert_eq!(Some(Match::must(0, 0..3)), re.find(input));
-///
-/// # Ok::<(), Box<dyn std::error::Error>>(())
-/// ```
-///
-/// # Example: earliest search
-///
-/// This example shows how to use [`Input::earliest`] to run a search that
-/// might stop before finding the typical leftmost match.
-///
-/// ```ignore
-/// use ib_matcher::regex::{cp::Regex, Anchored, Input, Match};
-///
-/// let re = Regex::new(r"[a-z]{3}|b")?;
-/// let input = Input::new("abc").earliest(true);
-/// assert_eq!(Some(Match::must(0, 1..2)), re.find(input));
-///
-/// // Note that "earliest" isn't really a match semantic unto itself.
-/// // Instead, it is merely an instruction to whatever regex engine
-/// // gets used internally to quit as soon as it can. For example,
-/// // this regex uses a different search technique, and winds up
-/// // producing a different (but valid) match!
-/// let re = Regex::new(r"abc|b")?;
-/// let input = Input::new("abc").earliest(true);
-/// assert_eq!(Some(Match::must(0, 0..3)), re.find(input));
-///
-/// # Ok::<(), Box<dyn std::error::Error>>(())
-/// ```
-///
-/// # Example: change the line terminator
-///
-/// This example shows how to enable multi-line mode by default and change
-/// the line terminator to the NUL byte:
-///
-/// ```
-/// use ib_matcher::regex::{cp::Regex, util::{syntax, look::LookMatcher}, Match};
-///
-/// let mut lookm = LookMatcher::new();
-/// lookm.set_line_terminator(b'\x00');
-/// let re = Regex::builder()
-///     .syntax(syntax::Config::new().multi_line(true))
-///     .configure(Regex::config().look_matcher(lookm))
-///     .build(r"^foo$")?;
-/// let hay = "\x00foo\x00";
-/// assert_eq!(Some(Match::must(0, 1..4)), re.find(hay));
-///
-/// # Ok::<(), Box<dyn std::error::Error>>(())
-/// ```
 pub struct Regex<'a> {
     /// The actual regex implementation.
     imp: Arc<RegexI<'a>>,

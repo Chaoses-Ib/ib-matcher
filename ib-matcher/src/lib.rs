@@ -1,5 +1,24 @@
-//! A multilingual and fast string matcher, supports 拼音匹配 (Chinese pinyin match) and ローマ字検索 (Japanese romaji match).
-//!
+//! A multilingual and fast string and regex matcher, supports 拼音匹配 (Chinese pinyin match) and ローマ字検索 (Japanese romaji match).
+/*!
+## Features
+- Unicode support
+  - Fully UTF-8 support and limited support for UTF-16 and UTF-32.
+  - Unicode case insensitivity.
+- [Chinese pinyin](https://en.wikipedia.org/wiki/Pinyin) matching (拼音匹配)
+  - Support characters with multiple readings (i.e. heteronyms, 多音字).
+  - Support multiple pinyin notations, including [Quanpin (全拼)](https://zh.wikipedia.org/wiki/全拼), [Jianpin (简拼)](https://zh.wikipedia.org/wiki/简拼) and many [Shuangpin (双拼)](https://zh.wikipedia.org/wiki/%E5%8F%8C%E6%8B%BC) notations.
+  - Support mixing multiple notations during matching.
+- [Japanese romaji](https://en.wikipedia.org/wiki/Romanization_of_Japanese) matching (ローマ字検索)
+  - Support characters with multiple readings (i.e. heteronyms, 同形異音語).
+  - Support [Hepburn romanization system](https://en.wikipedia.org/wiki/Hepburn_romanization) only at the moment.
+- [Regular expression](https://en.wikipedia.org/wiki/Regular_expression)
+  - Support the same syntax as [`regex`](https://docs.rs/regex/), including wildcards, repetitions, alternations, groups, etc.
+- Relatively high performance
+
+And all of the above features are optional. You don't need to pay the performance and binary size cost for features you don't use.
+
+You can also use [ib-pinyin](https://docs.rs/ib-pinyin/) if you only need Chinese pinyin match, which is simpler and more stable.
+*/
 //! ## Usage
 //! ```
 //! //! cargo add ib-matcher --features pinyin,romaji
@@ -21,7 +40,45 @@
 //!     .build();
 //! assert!(matcher.is_match("この素晴らしい世界に祝福を"));
 //! ```
-//!
+/*!
+## Regular expression
+See [`regex`] module for more details. For example:
+```
+// cargo add ib-matcher --features regex,pinyin,romaji
+use ib_matcher::{
+    matcher::{MatchConfig, PinyinMatchConfig, RomajiMatchConfig},
+    regex::{cp::Regex, Match},
+};
+
+let config = MatchConfig::builder()
+    .pinyin(PinyinMatchConfig::default())
+    .romaji(RomajiMatchConfig::default())
+    .build();
+
+let re = Regex::builder()
+    .ib(config.shallow_clone())
+    .build("raki.suta")
+    .unwrap();
+assert_eq!(re.find("「らき☆すた」"), Some(Match::must(0, 3..18)));
+
+let re = Regex::builder()
+    .ib(config.shallow_clone())
+    .build("pysou.*?(any|every)thing")
+    .unwrap();
+assert_eq!(re.find("拼音搜索Everything"), Some(Match::must(0, 0..22)));
+
+let config = MatchConfig::builder()
+    .pinyin(PinyinMatchConfig::default())
+    .romaji(RomajiMatchConfig::default())
+    .mix_lang(true)
+    .build();
+let re = Regex::builder()
+    .ib(config.shallow_clone())
+    .build("(?x)^zangsounofuri-?ren # Mixing pinyin and romaji")
+    .unwrap();
+assert_eq!(re.find("葬送のフリーレン"), Some(Match::must(0, 0..24)));
+```
+*/
 //! ## Performance
 //! The following `Cargo.toml` settings are recommended if best performance is desired:
 //! ```toml
@@ -31,7 +88,7 @@
 //! ```
 //! These can improve the performance by 5~10% at most.
 //!
-//! ## Features
+//! ## Crate features
 #![cfg_attr(docsrs, feature(doc_auto_cfg))]
 #![cfg_attr(feature = "doc", doc = document_features::document_features!())]
 
@@ -55,3 +112,42 @@ mod private {
     pub trait Sealed {}
 }
 use private::Sealed;
+
+#[cfg(test)]
+mod tests {
+    use crate::{
+        matcher::{MatchConfig, PinyinMatchConfig, RomajiMatchConfig},
+        regex::{cp::Regex, Match},
+    };
+
+    #[test]
+    fn regex() {
+        let config = MatchConfig::builder()
+            .pinyin(PinyinMatchConfig::default())
+            .romaji(RomajiMatchConfig::default())
+            .build();
+
+        let re = Regex::builder()
+            .ib(config.shallow_clone())
+            .build("raki.suta")
+            .unwrap();
+        assert_eq!(re.find("「らき☆すた」"), Some(Match::must(0, 3..18)));
+
+        let re = Regex::builder()
+            .ib(config.shallow_clone())
+            .build("pysou.*?(any|every)thing")
+            .unwrap();
+        assert_eq!(re.find("拼音搜索Everything"), Some(Match::must(0, 0..22)));
+
+        let config = MatchConfig::builder()
+            .pinyin(PinyinMatchConfig::default())
+            .romaji(RomajiMatchConfig::default())
+            .mix_lang(true)
+            .build();
+        let re = Regex::builder()
+            .ib(config.shallow_clone())
+            .build("(?x)^zangsounofuri-?ren # Mixing pinyin and romaji")
+            .unwrap();
+        assert_eq!(re.find("葬送のフリーレン"), Some(Match::must(0, 0..24)));
+    }
+}

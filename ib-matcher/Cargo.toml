@@ -1,6 +1,6 @@
 [package]
 name = "ib-matcher"
-version = "0.3.1"
+version = "0.3.2"
 edition = "2021"
 rust-version = "1.75"
 description = "A multilingual and fast string matcher, supports 拼音匹配 (Chinese pinyin match) and ローマ字検索 (Japanese romaji match)"
@@ -14,7 +14,18 @@ license.workspace = true
 
 [features]
 default = ["std", "perf", "romaji-compress-words", "regex-unicode"]
+## 
+## - For [`regex`]:
+## When enabled, this will cause `regex` to use the standard library. In terms
+## of APIs, `std` causes error types to implement the `std::error::Error`
+## trait. Enabling `std` will also result in performance optimizations,
+## including SIMD and faster synchronization primitives. Notably, **disabling
+## the `std` feature will result in the use of spin locks**. To use a regex
+## engine without `std` and without spin locks, you'll need to drop down to
+## use APIs that accept a `Cache` value explicitly.
 std = ["regex-automata?/std", "regex-syntax?/std", "alloc"]
+## Enables use of the `alloc` library. This is required for most
+## APIs in this crate.
 alloc = ["regex-automata?/alloc"]
 
 ## Chinese pinyin match support.
@@ -29,8 +40,16 @@ romaji-compress-words = ["ib-romaji?/compress-words"]
 ## Pattern syntax support. See [`syntax`] for details.
 syntax = []
 
+## Regular expression support. See [`regex`] for details. Equivalent to features `regex-automata,regex-syntax`.
 regex = ["regex-automata", "regex-syntax"]
+## Regex engines.
 regex-automata = ["regex-automata/nfa-thompson", "alloc"]
+## Enables a dependency on `regex-syntax`. This makes APIs
+## for building regex engines from pattern strings available. Without the
+## `regex-syntax` dependency, the only way to build a regex engine is generally
+## to deserialize a previously built DFA or to hand assemble an NFA using its
+## [builder API](regex::nfa::thompson::Builder). Once you have an NFA, you can build any
+## of the regex engines in this crate. The `syntax` feature also enables `alloc`.
 regex-syntax = ["dep:regex-syntax", "regex-automata?/syntax", "alloc"]
 ## Enables all regex Unicode features. This feature is enabled by default, and will
 ## always cover all Unicode features, even if more are added in the future.
