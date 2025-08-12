@@ -40,6 +40,12 @@ pub struct PinyinMatchConfig<'a> {
     pub(crate) allow_partial_pattern: bool,
 }
 
+impl Default for PinyinMatchConfig<'_> {
+    fn default() -> Self {
+        Self::notations(PinyinNotation::Ascii | PinyinNotation::AsciiFirstLetter)
+    }
+}
+
 impl<'a> PinyinMatchConfig<'a> {
     /// Use [`PinyinMatchConfigBuilder`] for more options.
     pub fn notations(notations: PinyinNotation) -> Self {

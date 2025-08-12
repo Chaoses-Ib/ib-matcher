@@ -29,6 +29,28 @@ pub use crate::regex::nfa::{
     thompson::BuildError,
 };
 
+/// # Case insensitivity
+/// To enable case insensitivity:
+/// ```
+/// use ib_matcher::{matcher::{PinyinMatchConfig, PlainMatchConfig, MatchConfig}, regex::cp::Regex};
+///
+/// let re = Regex::builder().ib(MatchConfig::default()).build("foo").unwrap();
+/// assert!(re.is_match("FOO"));
+///
+/// // Alternatively, with `case_insensitive()`:
+/// let re = Regex::builder()
+///     .ib(MatchConfig::builder()
+///         .case_insensitive(true)
+///         .pinyin(PinyinMatchConfig::default())
+///         .build())
+///     .build("pyss")
+///     .unwrap();
+/// assert!(re.is_match("PY搜索"));
+/// ```
+/// Note that enabling `syntax.case_insensitive` will make `ib` (i.e. pinyin and romaji match) doesn't work at the moment. You should only set [`MatchConfigBuilder::case_insensitive`](crate::matcher::MatchConfigBuilder::case_insensitive) ([`PlainMatchConfig::case_insensitive`](crate::matcher::PlainMatchConfig::case_insensitive)).
+///
+/// If you need case insensitive character classes, you need to write `(?i:[a-z])` instead at the moment.
+///
 /// # Synchronization and cloning
 ///
 /// In order to make the `Regex` API convenient, most of the routines hide
@@ -301,7 +323,7 @@ impl<'a> Regex<'a> {
         #[builder(default)]
         configure: thompson::Config,
         /// [`IbMatcher`] config.
-        #[builder(default)]
+        #[builder(default = MatchConfig::builder().case_insensitive(false).build())]
         ib: MatchConfig<'a>,
         #[builder(default = backtrack::Config::new().visited_capacity(usize::MAX / 8))]
         backtrack: backtrack::Config,
@@ -424,16 +446,21 @@ impl<'a, S: builder::State> Builder<'a, S> {
     where
         S: builder::IsComplete,
     {
+        // Bypass case_fold_char()
+        // case_insensitive class and (?i) will be broken
+        // .case_insensitive(false)
+        let syntax = self.syntax;
+
         // Parse
         let hirs = patterns
             .into_iter()
             .map(|pattern| {
                 let pattern = pattern.as_ref();
-                regex_automata::util::syntax::parse_with(pattern, &self.syntax)
+                regex_automata::util::syntax::parse_with(pattern, &syntax)
                     .map_err(|_| {
                         // Shit
                         thompson::Compiler::new()
-                            .syntax(self.syntax)
+                            .syntax(syntax)
                             .build(pattern)
                             .unwrap_err()
                     })

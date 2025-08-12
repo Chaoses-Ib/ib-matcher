@@ -756,6 +756,21 @@ where
     }
 }
 
+impl<'a, S: match_config_builder::State> MatchConfigBuilder<'a, S> {
+    /// A convenient setter for [`PlainMatchConfigBuilder::case_insensitive`].
+    ///
+    /// The case insensitivity of pinyin is controlled by [`PinyinMatchConfigBuilder::case_insensitive`].
+    pub fn case_insensitive(
+        self,
+        case_insensitive: bool,
+    ) -> MatchConfigBuilder<'a, match_config_builder::SetPlain<S>>
+    where
+        S::Plain: ib_matcher_builder::IsUnset,
+    {
+        self.plain(PlainMatchConfig::case_insensitive(case_insensitive))
+    }
+}
+
 impl<'a, 'p, HaystackStr, S: ib_matcher_builder::State> IbMatcherBuilder<'a, 'p, HaystackStr, S>
 where
     HaystackStr: EncodedStr + ?Sized,
