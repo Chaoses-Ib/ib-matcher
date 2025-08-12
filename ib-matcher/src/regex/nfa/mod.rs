@@ -435,15 +435,34 @@ impl NFA {
         }
     }
 
+    pub(crate) fn count_bytes(&self, lt: u8) -> usize {
+        self.states()
+            .iter()
+            .filter(|s| {
+                matches!(s, State::Nfa(thompson::State::ByteRange { trans: thompson::Transition { start, end, .. } }) if start == end && *start < lt)
+            })
+            .count()
+    }
+
+    /// [`thompson::State::ByteRange`] may come from `c_literal()`, `c_alt_slice()` and [`thompson::State::Sparse`]:
+    /// - `c_literal()` and `c_alt_slice()` can be controlled by [`crate::regex::syntax::fold::fold_literal()`]
+    /// - `Sparse` may come from:
+    ///   - `c_byte_class()` (only if `build_from_hir()`)
+    ///   - `Utf8Compiler` from `c_unicode_class()` with non-ASCII class. Its byte is presumably always larger than 0x7F.
+    ///   - `LiteralTrie` from `c_alt_slice()`
+    ///
+    /// Limit fold to the first 128 literals? Unfolded literals are more prone to conflict; folded literals at least only conflict if there are Unicode classes.
     pub(crate) fn patch_bytes_to_matchers(
         &mut self,
+        lt: u8,
         mut matcher: impl FnMut(u8) -> IbMatcher<'static>,
     ) {
+        debug_assert_eq!(self.count_bytes(lt), lt as usize, "Too many bytes");
         for s in self.states_mut() {
             match *s {
                 State::Nfa(thompson::State::ByteRange {
                     trans: thompson::Transition { start, end, next },
-                }) if start == end => {
+                }) if start == end && start < lt => {
                     *s = State::IbMatcher { matcher: matcher(start), next };
                 }
                 _ => (),
@@ -493,7 +512,7 @@ mod tests {
             syntax::fold::parse_and_fold_literal_utf8("pyss").unwrap();
         let mut nfa: NFA =
             thompson::Compiler::new().build_from_hir(&hir).unwrap().into();
-        nfa.patch_bytes_to_matchers(|b| {
+        nfa.patch_bytes_to_matchers(literals.len() as u8, |b| {
             IbMatcher::builder(literals[b as usize].as_str())
                 .pinyin(PinyinMatchConfig::notations(
                     PinyinNotation::Ascii | PinyinNotation::AsciiFirstLetter,
@@ -506,6 +525,68 @@ mod tests {
         assert_eq!(
             re.try_find(&mut cache, "拼音搜索").unwrap(),
             Some(Match::must(0, 0..12)),
+        );
+    }
+
+    #[test]
+    fn patch_bytes_conflict_gt() {
+        let mut parser =
+            syntax::ParserBuilder::new().case_insensitive(true).build();
+        let hir = parser.parse("δ").unwrap();
+
+        let (mut hirs, literals) =
+            syntax::fold::fold_literal_utf8(std::iter::once(hir));
+        let hir = hirs.pop().unwrap();
+
+        let mut nfa: NFA =
+            thompson::Compiler::new().build_from_hir(&hir).unwrap().into();
+        dbg!(&nfa);
+
+        nfa.patch_bytes_to_matchers(literals.len() as u8, |b| {
+            IbMatcher::builder(literals[b as usize].as_str())
+                .pinyin(PinyinMatchConfig::notations(
+                    PinyinNotation::Ascii | PinyinNotation::AsciiFirstLetter,
+                ))
+                .build()
+        });
+        dbg!(&nfa);
+
+        let re = BoundedBacktracker::new_from_nfa(nfa).unwrap();
+        let mut cache = re.create_cache();
+        assert_eq!(
+            re.try_find(&mut cache, "Δ").unwrap(),
+            Some(Match::must(0, 0..2)),
+        );
+    }
+
+    #[should_panic(expected = "Too many bytes")]
+    #[test]
+    fn patch_bytes_conflict_lt() {
+        let (hir, literals) = syntax::fold::parse_and_fold_literal_utf8(
+            // r"a([\x00-\x00\u0100\u0200])",
+            &format!(r"{}[\u0100\u0200]", "(a)".repeat(129)),
+        )
+        .unwrap();
+        dbg!(&hir, &literals);
+
+        let mut nfa: NFA =
+            thompson::Compiler::new().build_from_hir(&hir).unwrap().into();
+        dbg!(&nfa);
+
+        nfa.patch_bytes_to_matchers(literals.len() as u8, |b| {
+            IbMatcher::builder(literals[b as usize].as_str())
+                .pinyin(PinyinMatchConfig::notations(
+                    PinyinNotation::Ascii | PinyinNotation::AsciiFirstLetter,
+                ))
+                .build()
+        });
+        dbg!(&nfa);
+
+        let re = BoundedBacktracker::new_from_nfa(nfa).unwrap();
+        let mut cache = re.create_cache();
+        assert_eq!(
+            re.try_find(&mut cache, "Δ").unwrap(),
+            Some(Match::must(0, 0..2)),
         );
     }
 }

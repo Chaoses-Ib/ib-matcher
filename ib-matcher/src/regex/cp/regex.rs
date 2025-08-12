@@ -323,7 +323,7 @@ impl<'a> Regex<'a> {
             .configure(configure)
             .build_many_from_hir(&hirs)?
             .into();
-        nfa.patch_bytes_to_matchers(|b| {
+        nfa.patch_bytes_to_matchers(literals.len() as u8, |b| {
             // `shallow_clone()` requires `config` cannot be moved
             let config: MatchConfig<'static> =
                 unsafe { transmute(imp.config.shallow_clone()) };
@@ -779,6 +779,15 @@ mod tests {
         );
 
         assert_eq!(re.find("pyss"), Some(Match::must(0, 0..4)),);
+    }
+
+    #[test]
+    fn case() {
+        let re = Regex::builder()
+            .syntax(util::syntax::Config::new().case_insensitive(true))
+            .build(r"δ")
+            .unwrap();
+        assert_eq!(Some(Match::must(0, 0..2)), re.find(r"Δ"));
     }
 
     #[test]
