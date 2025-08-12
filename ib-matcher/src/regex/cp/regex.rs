@@ -791,6 +791,22 @@ mod tests {
     }
 
     #[test]
+    fn alt() {
+        let pinyin = PinyinMatchConfig::notations(
+            PinyinNotation::Ascii | PinyinNotation::AsciiFirstLetter,
+        );
+
+        let re = Regex::builder().build("samwise|sam").unwrap();
+        assert_eq!(Some(Match::must(0, 0..3)), re.find("sam"));
+
+        let re = Regex::builder()
+            .ib(MatchConfig::builder().pinyin(pinyin.shallow_clone()).build())
+            .build("samwise|pyss")
+            .unwrap();
+        assert_eq!(Some(Match::must(0, 0..12)), re.find("拼音搜索"));
+    }
+
+    #[test]
     fn wildcard() {
         let re = Regex::builder()
             .ib(MatchConfig::builder()

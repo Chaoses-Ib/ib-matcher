@@ -60,6 +60,9 @@ fn fold_literal_common<T>(
                 match f(literal.0) {
                     Ok(literal) => {
                         literals.push(literal);
+                        // maximum_len is only used by meta
+                        // minimum_len is also used by c_at_least(), but only to test > 0
+                        // utf8 is not used
                         Hir::literal([i as u8])
                     }
                     Err(literal) => Hir::literal(literal),
@@ -93,13 +96,22 @@ fn fold_literal_common<T>(
                 Hir::concat(subs)
             }
             HirKind::Alternation(_) => {
-                let subs = match hir.into_kind() {
+                // let all_literal = subs
+                //     .iter()
+                //     .all(|sub| matches!(sub.kind(), HirKind::Literal(_)));
+                let all_literal = hir.properties().is_alternation_literal();
+                let it = match hir.into_kind() {
                     HirKind::Alternation(subs) => subs,
                     _ => unreachable!(),
                 }
                 .into_iter()
-                .map(|sub| fold_literal(sub, literals, f))
-                .collect();
+                .map(|sub| fold_literal(sub, literals, f));
+                let subs = if all_literal {
+                    // Bypass Hir::alternation() and c_alt_slice()
+                    it.chain(iter::once(Hir::fail())).collect()
+                } else {
+                    it.collect()
+                };
                 Hir::alternation(subs)
             }
         }

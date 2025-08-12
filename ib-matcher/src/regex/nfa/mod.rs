@@ -589,4 +589,31 @@ mod tests {
             Some(Match::must(0, 0..2)),
         );
     }
+
+    #[test]
+    fn patch_bytes_alt() {
+        let (hir, literals) =
+            syntax::fold::parse_and_fold_literal_utf8("samwise|sam").unwrap();
+        dbg!(&hir, &literals);
+
+        let mut nfa: NFA =
+            thompson::Compiler::new().build_from_hir(&hir).unwrap().into();
+        dbg!(&nfa);
+
+        nfa.patch_bytes_to_matchers(literals.len() as u8, |b| {
+            IbMatcher::builder(literals[b as usize].as_str())
+                .pinyin(PinyinMatchConfig::notations(
+                    PinyinNotation::Ascii | PinyinNotation::AsciiFirstLetter,
+                ))
+                .build()
+        });
+        dbg!(&nfa);
+
+        let re = BoundedBacktracker::new_from_nfa(nfa).unwrap();
+        let mut cache = re.create_cache();
+        assert_eq!(
+            re.try_find(&mut cache, "sam").unwrap(),
+            Some(Match::must(0, 0..3)),
+        );
+    }
 }
