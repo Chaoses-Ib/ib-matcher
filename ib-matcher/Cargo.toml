@@ -28,6 +28,7 @@ std = ["regex-automata?/std", "regex-syntax?/std", "alloc"]
 ## APIs in this crate.
 alloc = ["regex-automata?/alloc"]
 
+#! ### Languages
 ## Chinese pinyin match support.
 pinyin = ["dep:arraystring", "dep:bitflags"]
 ## Japanese romaji match support.
@@ -40,6 +41,7 @@ romaji-compress-words = ["ib-romaji?/compress-words"]
 ## Pattern syntax support. See [`syntax`] for details.
 syntax = []
 
+#! ### Regular expression
 ## Regular expression support. See [`regex`] for details. Equivalent to features `regex-automata,regex-syntax`.
 regex = ["regex-automata", "regex-syntax"]
 ## Regex engines.
@@ -57,6 +59,7 @@ regex-syntax = ["dep:regex-syntax", "regex-automata?/syntax", "alloc"]
 ## always cover all Unicode features, even if more are added in the future.
 regex-unicode = ["regex-automata?/unicode", "regex-syntax?/unicode"]
 
+#! ### Performance
 ## Enables all performance related features. This feature is enabled by default is intended to cover all reasonable features that improve performance, even if more are added in the future.
 perf = ["perf-inline", "perf-unicode-case-map"]
 ## Enables aggressive use of inlining.
@@ -71,6 +74,7 @@ perf-unicode-case-map = ["ib-unicode/perf-case-map"]
 ## Build size +837.5 KiB
 perf-regex-plain = ["dep:regex"]
 
+#! ### FFI
 ## Make [`pinyin::PinyinData`] interior mutable. So it can be easily used as a `static` variable.
 inmut-data = []
 ## Minimal APIs that can be used in one call. See [`minimal`] for details.
