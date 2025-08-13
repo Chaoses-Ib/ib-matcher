@@ -39,10 +39,12 @@ romaji = ["dep:ib-romaji"]
 romaji-compress-words = ["ib-romaji?/compress-words"]
 
 #! ### Syntax
-## Pattern syntax support. Include features `syntax-glob`. See [`syntax`] for details.
-syntax = ["syntax-glob"]
+## Pattern syntax support. Include features `syntax-glob,syntax-ev`. See [`syntax`] for details.
+syntax = ["syntax-glob", "syntax-ev"]
 ## glob()-style pattern matching syntax support. See [`syntax::glob`] for details.
 syntax-glob = ["dep:logos", "regex-syntax"]
+## Support for the syntax used by [IbEverythingExt](https://github.com/Chaoses-Ib/IbEverythingExt). See [`syntax::ev`] for details.
+syntax-ev = []
 
 #! ### Regular expression
 ## Regular expression support. See [`regex`] for details. Equivalent to features `regex-automata,regex-syntax`.

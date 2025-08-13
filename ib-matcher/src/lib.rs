@@ -122,7 +122,7 @@ pub mod minimal;
 pub mod pinyin;
 #[cfg(any(feature = "regex-automata", feature = "regex-syntax"))]
 pub mod regex;
-#[cfg(any(feature = "syntax", feature = "syntax-glob"))]
+#[cfg(any(feature = "syntax-glob", feature = "syntax-ev"))]
 pub mod syntax;
 pub mod unicode;
 
