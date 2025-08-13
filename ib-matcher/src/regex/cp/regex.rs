@@ -13,7 +13,7 @@ use regex_syntax::hir::Hir;
 #[cfg(feature = "regex-callback")]
 use crate::regex::nfa::Callback;
 use crate::{
-    matcher::{IbMatcher, MatchConfig},
+    matcher::{pattern::Pattern, IbMatcher, MatchConfig},
     regex::{
         nfa::{
             backtrack::{self, BoundedBacktracker},
@@ -394,6 +394,22 @@ impl<'a> Regex<'a> {
         /// [`IbMatcher`] config.
         #[builder(default = MatchConfig::builder().case_insensitive(false).build())]
         ib: MatchConfig<'a>,
+        /// `IbMatcher` pattern parser.
+        ///
+        /// ### Example
+        /// ```
+        /// use ib_matcher::{regex::cp::Regex, matcher::{MatchConfig, pattern::Pattern}};
+        ///
+        /// let re = Regex::builder()
+        ///     .ib(MatchConfig::builder().pinyin(Default::default()).build())
+        ///     .ib_parser(&mut |pattern| Pattern::parse_ev(pattern).call())
+        ///     .build("pinyin;py")
+        ///     .unwrap();
+        /// assert!(re.is_match("拼音搜索"));
+        /// assert!(re.is_match("pinyin") == false);
+        /// ```
+        /// See [`crate::syntax::ev`] for more details.
+        mut ib_parser: Option<&mut dyn FnMut(&str) -> Pattern<str>>,
         #[builder(default = backtrack::Config::new().visited_capacity(usize::MAX / 8))]
         backtrack: backtrack::Config,
     ) -> Result<Self, BuildError> {
@@ -432,10 +448,17 @@ impl<'a> Regex<'a> {
             count
         };
         nfa.patch_bytes_to_matchers(literals.len() as u8, count, |b| {
+            let pattern = literals[b as usize].as_str();
+            let pattern = if let Some(ib_parser) = ib_parser.as_mut() {
+                ib_parser(pattern)
+            } else {
+                pattern.into()
+            };
+
             // `shallow_clone()` requires `config` cannot be moved
             let config: MatchConfig<'static> =
                 unsafe { transmute(imp.config.shallow_clone()) };
-            IbMatcher::with_config(literals[b as usize].as_str(), config)
+            IbMatcher::with_config(pattern, config)
         });
         #[cfg(test)]
         dbg!(&nfa);
@@ -450,7 +473,7 @@ impl<'a> Regex<'a> {
     }
 }
 
-impl<'a, S: builder::State> Builder<'a, S> {
+impl<'a, S: builder::State> Builder<'a, '_, S> {
     /// Configure the syntax options when parsing a pattern string while
     /// building a `Regex`.
     ///

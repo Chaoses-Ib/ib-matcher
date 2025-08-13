@@ -15,6 +15,41 @@ let matcher = IbMatcher::builder(Pattern::parse_ev("pinyin;py").call())
 assert!(matcher.is_match("拼音搜索"));
 assert!(matcher.is_match("pinyin") == false);
 ```
+
+## With `Regex`
+```
+use ib_matcher::{regex::cp::Regex, matcher::{MatchConfig, pattern::Pattern}};
+
+let re = Regex::builder()
+    .ib(MatchConfig::builder().pinyin(Default::default()).build())
+    .ib_parser(&mut |pattern| Pattern::parse_ev(pattern).call())
+    .build("pinyin;py")
+    .unwrap();
+assert!(re.is_match("拼音搜索"));
+assert!(re.is_match("pinyin") == false);
+```
+
+## With [`glob`](super::glob)
+```
+use ib_matcher::{
+    matcher::{MatchConfig, pattern::Pattern},
+    regex::cp::Regex,
+    syntax::glob::{parse_wildcard_path, PathSeparator}
+};
+
+let re = Regex::builder()
+    .ib(MatchConfig::builder().pinyin(Default::default()).build())
+    .ib_parser(&mut |pattern| Pattern::parse_ev(pattern).call())
+    .build_from_hir(
+        parse_wildcard_path()
+            .separator(PathSeparator::Windows)
+            .call(r"pinyin;py**sou;py"),
+    )
+    .unwrap();
+assert!(re.is_match(r"C:\拼音\System32\搜索.exe"));
+assert!(re.is_match(r"C:\pinyin\System32\搜索.exe") == false);
+assert!(re.is_match(r"C:\pinyin\System32\sousuo.exe") == false);
+```
 */
 
 use bon::bon;
@@ -87,8 +122,10 @@ impl<'a> Pattern<'a, str> {
 #[cfg(test)]
 mod tests {
     use crate::{
-        matcher::{IbMatcher, PinyinMatchConfig},
+        matcher::{IbMatcher, MatchConfig, PinyinMatchConfig},
         pinyin::PinyinNotation,
+        regex::cp::Regex,
+        syntax::glob::{parse_wildcard_path, PathSeparator},
     };
 
     use super::*;
@@ -116,5 +153,32 @@ mod tests {
             .build();
         assert!(matcher.is_match("拼音搜索"));
         assert!(matcher.is_match("pinyin") == false);
+    }
+
+    #[test]
+    fn re() {
+        let re = Regex::builder()
+            .ib(MatchConfig::builder().pinyin(Default::default()).build())
+            .ib_parser(&mut |pattern| Pattern::parse_ev(pattern).call())
+            .build("pinyin;py")
+            .unwrap();
+        assert!(re.is_match("拼音搜索"));
+        assert!(re.is_match("pinyin") == false);
+    }
+
+    #[test]
+    fn glob() {
+        let re = Regex::builder()
+            .ib(MatchConfig::builder().pinyin(Default::default()).build())
+            .ib_parser(&mut |pattern| Pattern::parse_ev(pattern).call())
+            .build_from_hir(
+                parse_wildcard_path()
+                    .separator(PathSeparator::Windows)
+                    .call(r"pinyin;py**sou;py"),
+            )
+            .unwrap();
+        assert!(re.is_match(r"C:\拼音\System32\搜索.exe"));
+        assert!(re.is_match(r"C:\pinyin\System32\搜索.exe") == false);
+        assert!(re.is_match(r"C:\pinyin\System32\sousuo.exe") == false);
     }
 }
