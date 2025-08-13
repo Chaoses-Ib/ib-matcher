@@ -1,8 +1,28 @@
+/*!
+A collection of syntax parsers for either [`IbMatcher`](crate::matcher::IbMatcher) or [`Regex`](crate::regex::cp::Regex).
+
+## glob()-style pattern matching syntax
+See [`glob`] for details. For example:
+```
+use ib_matcher::{regex::cp::Regex, syntax::glob::{parse_wildcard_path, PathSeparator}};
+
+let re = Regex::builder()
+    .build_from_hir(
+        parse_wildcard_path()
+            .separator(PathSeparator::Windows)
+            .call(r"Win*\*\*.exe"),
+    )
+    .unwrap();
+assert!(re.is_match(r"C:\Windows\System32\notepad.exe"));
+```
+
+## IbEverythingExt flavour
+*/
 //! Parse a pattern according to the syntax used by [IbEverythingExt](https://github.com/Chaoses-Ib/IbEverythingExt).
 //!
 //! See [`Pattern::parse_ev`].
 //!
-//! ## Example
+//! ### Example
 //! ```
 //! use ib_matcher::{matcher::{IbMatcher, PinyinMatchConfig, pattern::Pattern}, pinyin::PinyinNotation};
 //!
@@ -16,6 +36,10 @@ use bon::bon;
 
 use crate::matcher::pattern::{LangOnly, Pattern};
 
+#[cfg(feature = "syntax-glob")]
+pub mod glob;
+
+#[cfg(feature = "syntax")]
 #[bon]
 impl<'a> Pattern<'a, str> {
     /// Parse a pattern according to the syntax used by [IbEverythingExt](https://github.com/Chaoses-Ib/IbEverythingExt).

@@ -3,7 +3,7 @@
 [![Documentation](https://docs.rs/ib-matcher/badge.svg)](https://docs.rs/ib-matcher)
 [![License](https://img.shields.io/crates/l/ib-matcher.svg)](LICENSE.txt)
 
-A multilingual and fast string and regex matcher, supports 拼音匹配 (Chinese pinyin match) and ローマ字検索 (Japanese romaji match).
+A multilingual, flexible and fast string and regex matcher, supports 拼音匹配 (Chinese pinyin match) and ローマ字検索 (Japanese romaji match).
 
 ## Features
 - Unicode support
@@ -16,6 +16,7 @@ A multilingual and fast string and regex matcher, supports 拼音匹配 (Chinese
 - [Japanese romaji](https://en.wikipedia.org/wiki/Romanization_of_Japanese) matching (ローマ字検索)
   - Support characters with multiple readings (i.e. heteronyms, 同形異音語).
   - Support [Hepburn romanization system](https://en.wikipedia.org/wiki/Hepburn_romanization) only at the moment.
+- glob()-style pattern matching (i.e. `?`, `*` and `**`)
 - [Regular expression](https://docs.rs/ib-matcher/latest/ib_matcher/regex/)
   - Support the same syntax as [`regex`](https://docs.rs/regex/), including wildcards, repetitions, alternations, groups, etc.
   - Support [custom matching callbacks](https://docs.rs/ib-matcher/latest/ib_matcher/regex/cp/struct.Regex.html#custom-matching-callbacks), which can be used to implement ad hoc look-around, backreferences, balancing groups/recursion/subroutines, combining domain-specific parsers, etc.

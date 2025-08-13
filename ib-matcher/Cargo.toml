@@ -23,7 +23,7 @@ default = ["std", "perf", "romaji-compress-words", "regex-unicode"]
 ## the `std` feature will result in the use of spin locks**. To use a regex
 ## engine without `std` and without spin locks, you'll need to drop down to
 ## use APIs that accept a `Cache` value explicitly.
-std = ["regex-automata?/std", "regex-syntax?/std", "alloc"]
+std = ["regex-automata?/std", "regex-syntax?/std", "logos?/std", "alloc"]
 ## Enables use of the `alloc` library. This is required for most
 ## APIs in this crate.
 alloc = ["regex-automata?/alloc"]
@@ -38,8 +38,11 @@ romaji = ["dep:ib-romaji"]
 ## Binary size (and memory usage) -696 KiB (771 KiB if zstd is already used), romanizer build time +1.1 ms.
 romaji-compress-words = ["ib-romaji?/compress-words"]
 
-## Pattern syntax support. See [`syntax`] for details.
-syntax = []
+#! ### Syntax
+## Pattern syntax support. Include features `syntax-glob`. See [`syntax`] for details.
+syntax = ["syntax-glob"]
+## glob()-style pattern matching syntax support. See [`syntax::glob`] for details.
+syntax-glob = ["dep:logos", "regex-syntax"]
 
 #! ### Regular expression
 ## Regular expression support. See [`regex`] for details. Equivalent to features `regex-automata,regex-syntax`.
@@ -95,6 +98,9 @@ document-features = { version = "0.2", optional = true }
 ib-romaji = { version = "0.1.1", default-features = false, optional = true, path = "../ib-romaji" }
 ib-unicode = { version = "0.1", path = "../ib-unicode" }
 itertools = "0.14"
+logos = { version = "0.15", default-features = false, features = [
+    "export_derive",
+], optional = true }
 # TODO: perf-dfa-full
 regex = { version = "1.10.2", default-features = false, features = [
     "std",

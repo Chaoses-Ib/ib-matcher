@@ -1,5 +1,6 @@
-//! A multilingual and fast string and regex matcher, supports 拼音匹配 (Chinese pinyin match) and ローマ字検索 (Japanese romaji match).
 /*!
+A multilingual, flexible and fast string and regex matcher, supports 拼音匹配 (Chinese pinyin match) and ローマ字検索 (Japanese romaji match).
+
 ## Features
 - Unicode support
   - Fully UTF-8 support and limited support for UTF-16 and UTF-32.
@@ -11,6 +12,7 @@
 - [Japanese romaji](https://en.wikipedia.org/wiki/Romanization_of_Japanese) matching (ローマ字検索)
   - Support characters with multiple readings (i.e. heteronyms, 同形異音語).
   - Support [Hepburn romanization system](https://en.wikipedia.org/wiki/Hepburn_romanization) only at the moment.
+- [glob()-style](syntax::glob) pattern matching (i.e. `?`, `*` and `**`)
 - [Regular expression](regex)
   - Support the same syntax as [`regex`](https://docs.rs/regex/), including wildcards, repetitions, alternations, groups, etc.
   - Support [custom matching callbacks](regex::cp::Regex#custom-matching-callbacks), which can be used to implement ad hoc look-around, backreferences, balancing groups/recursion/subroutines, combining domain-specific parsers, etc.
@@ -120,7 +122,7 @@ pub mod minimal;
 pub mod pinyin;
 #[cfg(any(feature = "regex-automata", feature = "regex-syntax"))]
 pub mod regex;
-#[cfg(feature = "syntax")]
+#[cfg(any(feature = "syntax", feature = "syntax-glob"))]
 pub mod syntax;
 pub mod unicode;
 
