@@ -1,10 +1,12 @@
 use core::ops::Deref;
-use std::sync::Arc;
+use std::{fmt::Debug, sync::Arc};
 
 use itertools::Itertools;
 #[cfg(feature = "regex-syntax")]
 use regex_automata::nfa::thompson::BuildError;
 use regex_automata::util::primitives::StateID;
+#[cfg(feature = "regex-callback")]
+use regex_automata::Input;
 
 use crate::matcher::IbMatcher;
 
@@ -378,6 +380,8 @@ pub(super) struct Inner {
     states: Vec<State>,
 }
 
+pub type Callback = Arc<dyn Fn(&Input, usize, &mut dyn FnMut(usize))>;
+
 /// A state in an NFA.
 ///
 /// In theory, it can help to conceptualize an `NFA` as a graph consisting of
@@ -399,10 +403,17 @@ pub(super) struct Inner {
 /// directly are if you need to write your own search implementation or if you
 /// need to do some kind of analysis on the NFA.
 // Clone, Eq, PartialEq
-#[derive(Debug)]
 pub enum State {
     Nfa(thompson::State),
-    IbMatcher { matcher: IbMatcher<'static>, next: StateID },
+    IbMatcher {
+        matcher: IbMatcher<'static>,
+        next: StateID,
+    },
+    #[cfg(feature = "regex-callback")]
+    Callback {
+        callback: Callback,
+        next: StateID,
+    },
 }
 
 impl From<thompson::State> for State {
@@ -411,9 +422,42 @@ impl From<thompson::State> for State {
     }
 }
 
+impl Debug for State {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            State::Nfa(state) => write!(f, "Nfa({:?})", state),
+            State::IbMatcher { matcher, next } => {
+                write!(f, "IbMatcher({:?}, {:?})", matcher, next)
+            }
+            #[cfg(feature = "regex-callback")]
+            State::Callback { next, .. } => {
+                write!(f, "Callback({:?})", next)
+            }
+        }
+    }
+}
+
 impl NFA {
     pub fn states_mut(&mut self) -> &mut Vec<State> {
         &mut Arc::get_mut(&mut self.0).unwrap().states
+    }
+
+    pub fn patch_first_byte(
+        &mut self,
+        byte: u8,
+        state: impl FnOnce(StateID) -> State,
+    ) {
+        for s in self.states_mut() {
+            match *s {
+                State::Nfa(thompson::State::ByteRange {
+                    trans: thompson::Transition { start, end, next },
+                }) if start == byte && end == byte => {
+                    *s = state(next);
+                    break;
+                }
+                _ => (),
+            }
+        }
     }
 
     #[cfg(test)]
@@ -422,17 +466,7 @@ impl NFA {
         byte: u8,
         matcher: IbMatcher<'static>,
     ) {
-        for s in self.states_mut() {
-            match *s {
-                State::Nfa(thompson::State::ByteRange {
-                    trans: thompson::Transition { start, end, next },
-                }) if start == byte && end == byte => {
-                    *s = State::IbMatcher { matcher, next };
-                    break;
-                }
-                _ => (),
-            }
-        }
+        self.patch_first_byte(byte, |next| State::IbMatcher { matcher, next })
     }
 
     pub(crate) fn count_bytes(&self, lt: u8) -> usize {
@@ -455,9 +489,10 @@ impl NFA {
     pub(crate) fn patch_bytes_to_matchers(
         &mut self,
         lt: u8,
+        count: usize,
         mut matcher: impl FnMut(u8) -> IbMatcher<'static>,
     ) {
-        debug_assert_eq!(self.count_bytes(lt), lt as usize, "Too many bytes");
+        debug_assert_eq!(self.count_bytes(lt), count, "Too many bytes");
         for s in self.states_mut() {
             match *s {
                 State::Nfa(thompson::State::ByteRange {
@@ -512,13 +547,18 @@ mod tests {
             syntax::fold::parse_and_fold_literal_utf8("pyss").unwrap();
         let mut nfa: NFA =
             thompson::Compiler::new().build_from_hir(&hir).unwrap().into();
-        nfa.patch_bytes_to_matchers(literals.len() as u8, |b| {
-            IbMatcher::builder(literals[b as usize].as_str())
-                .pinyin(PinyinMatchConfig::notations(
-                    PinyinNotation::Ascii | PinyinNotation::AsciiFirstLetter,
-                ))
-                .build()
-        });
+        nfa.patch_bytes_to_matchers(
+            literals.len() as u8,
+            literals.len(),
+            |b| {
+                IbMatcher::builder(literals[b as usize].as_str())
+                    .pinyin(PinyinMatchConfig::notations(
+                        PinyinNotation::Ascii
+                            | PinyinNotation::AsciiFirstLetter,
+                    ))
+                    .build()
+            },
+        );
         dbg!(&nfa);
         let re = BoundedBacktracker::new_from_nfa(nfa).unwrap();
         let mut cache = re.create_cache();
@@ -542,13 +582,18 @@ mod tests {
             thompson::Compiler::new().build_from_hir(&hir).unwrap().into();
         dbg!(&nfa);
 
-        nfa.patch_bytes_to_matchers(literals.len() as u8, |b| {
-            IbMatcher::builder(literals[b as usize].as_str())
-                .pinyin(PinyinMatchConfig::notations(
-                    PinyinNotation::Ascii | PinyinNotation::AsciiFirstLetter,
-                ))
-                .build()
-        });
+        nfa.patch_bytes_to_matchers(
+            literals.len() as u8,
+            literals.len(),
+            |b| {
+                IbMatcher::builder(literals[b as usize].as_str())
+                    .pinyin(PinyinMatchConfig::notations(
+                        PinyinNotation::Ascii
+                            | PinyinNotation::AsciiFirstLetter,
+                    ))
+                    .build()
+            },
+        );
         dbg!(&nfa);
 
         let re = BoundedBacktracker::new_from_nfa(nfa).unwrap();
@@ -573,13 +618,18 @@ mod tests {
             thompson::Compiler::new().build_from_hir(&hir).unwrap().into();
         dbg!(&nfa);
 
-        nfa.patch_bytes_to_matchers(literals.len() as u8, |b| {
-            IbMatcher::builder(literals[b as usize].as_str())
-                .pinyin(PinyinMatchConfig::notations(
-                    PinyinNotation::Ascii | PinyinNotation::AsciiFirstLetter,
-                ))
-                .build()
-        });
+        nfa.patch_bytes_to_matchers(
+            literals.len() as u8,
+            literals.len(),
+            |b| {
+                IbMatcher::builder(literals[b as usize].as_str())
+                    .pinyin(PinyinMatchConfig::notations(
+                        PinyinNotation::Ascii
+                            | PinyinNotation::AsciiFirstLetter,
+                    ))
+                    .build()
+            },
+        );
         dbg!(&nfa);
 
         let re = BoundedBacktracker::new_from_nfa(nfa).unwrap();
@@ -600,13 +650,18 @@ mod tests {
             thompson::Compiler::new().build_from_hir(&hir).unwrap().into();
         dbg!(&nfa);
 
-        nfa.patch_bytes_to_matchers(literals.len() as u8, |b| {
-            IbMatcher::builder(literals[b as usize].as_str())
-                .pinyin(PinyinMatchConfig::notations(
-                    PinyinNotation::Ascii | PinyinNotation::AsciiFirstLetter,
-                ))
-                .build()
-        });
+        nfa.patch_bytes_to_matchers(
+            literals.len() as u8,
+            literals.len(),
+            |b| {
+                IbMatcher::builder(literals[b as usize].as_str())
+                    .pinyin(PinyinMatchConfig::notations(
+                        PinyinNotation::Ascii
+                            | PinyinNotation::AsciiFirstLetter,
+                    ))
+                    .build()
+            },
+        );
         dbg!(&nfa);
 
         let re = BoundedBacktracker::new_from_nfa(nfa).unwrap();

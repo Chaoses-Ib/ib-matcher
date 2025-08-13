@@ -1477,6 +1477,7 @@ impl BoundedBacktracker {
             if !cache.visited.insert(sid, at - input.start()) {
                 return None;
             }
+            // println!("step: {:?} {:?} {:?}", sid, at, self.nfa.state(sid));
             match *self.nfa.state(sid) {
                 super::State::Nfa(ref state) => match *state {
                     State::ByteRange { ref trans } => {
@@ -1584,6 +1585,24 @@ impl BoundedBacktracker {
                             });
                         }
                         None::<()>
+                    });
+                    if first {
+                        return None;
+                    }
+                }
+                #[cfg(feature = "regex-callback")]
+                super::State::Callback { ref callback, next } => {
+                    let mut first = true;
+                    callback(input, at, &mut |len| {
+                        if first {
+                            first = false;
+                            sid = next;
+                            at += len;
+                        } else {
+                            cache
+                                .stack
+                                .push(Frame::Step { sid: next, at: at + len });
+                        }
                     });
                     if first {
                         return None;

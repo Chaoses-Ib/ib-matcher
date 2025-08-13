@@ -11,8 +11,9 @@
 - [Japanese romaji](https://en.wikipedia.org/wiki/Romanization_of_Japanese) matching (ローマ字検索)
   - Support characters with multiple readings (i.e. heteronyms, 同形異音語).
   - Support [Hepburn romanization system](https://en.wikipedia.org/wiki/Hepburn_romanization) only at the moment.
-- [Regular expression](https://en.wikipedia.org/wiki/Regular_expression)
+- [Regular expression](regex)
   - Support the same syntax as [`regex`](https://docs.rs/regex/), including wildcards, repetitions, alternations, groups, etc.
+  - Support [custom matching callbacks](regex::cp::Regex#custom-matching-callbacks), which can be used to implement ad hoc look-around, backreferences, balancing groups/recursion/subroutines, combining domain-specific parsers, etc.
 - Relatively high performance
 
 And all of the above features are optional. You don't need to pay the performance and binary size cost for features you don't use.
@@ -77,6 +78,24 @@ let re = Regex::builder()
     .build("(?x)^zangsounofuri-?ren # Mixing pinyin and romaji")
     .unwrap();
 assert_eq!(re.find("葬送のフリーレン"), Some(Match::must(0, 0..24)));
+```
+
+[Custom matching callbacks](regex::cp::Regex#custom-matching-callbacks):
+```
+// cargo add ib-matcher --features regex,regex-callback
+use ib_matcher::regex::cp::Regex;
+
+let re = Regex::builder()
+    .callback("ascii", |input, at, push| {
+        let haystack = &input.haystack()[at..];
+        if haystack.len() > 0 && haystack[0].is_ascii() {
+            push(1);
+        }
+    })
+    .build(r"(ascii)+\d(ascii)+")
+    .unwrap();
+let hay = "that4Ｕ this4me";
+assert_eq!(&hay[re.find(hay).unwrap().span()], " this4me");
 ```
 */
 //! ## Performance

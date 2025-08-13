@@ -44,6 +44,8 @@ syntax = []
 regex = ["regex-automata", "regex-syntax"]
 ## Regex engines.
 regex-automata = ["regex-automata/nfa-thompson", "alloc"]
+## Regex with [custom matching callbacks](regex::cp::Regex#custom-matching-callbacks).
+regex-callback = ["regex-automata"]
 ## Enables a dependency on `regex-syntax`. This makes APIs
 ## for building regex engines from pattern strings available. Without the
 ## `regex-syntax` dependency, the only way to build a regex engine is generally
@@ -111,6 +113,7 @@ ib-matcher = { features = [
     "romaji",
     "syntax",
     "regex",
+    "regex-callback",
     "regex-syntax",
 ], path = "." }
 

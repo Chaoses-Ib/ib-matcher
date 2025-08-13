@@ -10,6 +10,8 @@ use bon::bon;
 use itertools::Itertools;
 use regex_syntax::hir::Hir;
 
+#[cfg(feature = "regex-callback")]
+use crate::regex::nfa::Callback;
 use crate::{
     matcher::{IbMatcher, MatchConfig},
     regex::{
@@ -62,6 +64,44 @@ group from the regex in the haystack.
 ///
 /// # Ok::<(), Box<dyn std::error::Error>>(())
 /// ```
+/**
+With `IbMatcher`'s Chinese pinyin and Japanese romaji matching:
+```
+// cargo add ib-matcher --features regex,pinyin,romaji
+use ib_matcher::{
+    matcher::{MatchConfig, PinyinMatchConfig, RomajiMatchConfig},
+    regex::{cp::Regex, Match},
+};
+
+let config = MatchConfig::builder()
+    .pinyin(PinyinMatchConfig::default())
+    .romaji(RomajiMatchConfig::default())
+    .build();
+
+let re = Regex::builder()
+    .ib(config.shallow_clone())
+    .build("raki.suta")
+    .unwrap();
+assert_eq!(re.find("「らき☆すた」"), Some(Match::must(0, 3..18)));
+
+let re = Regex::builder()
+    .ib(config.shallow_clone())
+    .build("pysou.*?(any|every)thing")
+    .unwrap();
+assert_eq!(re.find("拼音搜索Everything"), Some(Match::must(0, 0..22)));
+
+let config = MatchConfig::builder()
+    .pinyin(PinyinMatchConfig::default())
+    .romaji(RomajiMatchConfig::default())
+    .mix_lang(true)
+    .build();
+let re = Regex::builder()
+    .ib(config.shallow_clone())
+    .build("(?x)^zangsounofuri-?ren # Mixing pinyin and romaji")
+    .unwrap();
+assert_eq!(re.find("葬送のフリーレン"), Some(Match::must(0, 0..24)));
+```
+*/
 /// For more examples and the syntax, see [`crate::regex`].
 ///
 /// # Case insensitivity
@@ -86,6 +126,84 @@ group from the regex in the haystack.
 ///
 /// If you need case insensitive character classes, you need to write `(?i:[a-z])` instead at the moment.
 ///
+/**
+# Custom matching callbacks
+Custom matching callbacks can be used to implement ad hoc look-around, backreferences, balancing groups/recursion/subroutines, combining domain-specific parsers, etc.
+
+Basic usage:
+```
+// cargo add ib-matcher --features regex,regex-callback
+use ib_matcher::regex::cp::Regex;
+
+let re = Regex::builder()
+    .callback("ascii", |input, at, push| {
+        let haystack = &input.haystack()[at..];
+        if haystack.len() > 0 && haystack[0].is_ascii() {
+            push(1);
+        }
+    })
+    .build(r"(ascii)+\d(ascii)+")
+    .unwrap();
+let hay = "that4Ｕ this4me";
+assert_eq!(&hay[re.find(hay).unwrap().span()], " this4me");
+```
+
+## Look-around
+```
+use ib_matcher::regex::cp::Regex;
+
+let re = Regex::builder()
+    .callback("lookahead_is_ascii", |input, at, push| {
+        let haystack = &input.haystack()[at..];
+        if haystack.len() > 0 && haystack[0].is_ascii() {
+            push(0);
+        }
+    })
+    .build(r"[\x00-\x7f]+?\d(lookahead_is_ascii)")
+    .unwrap();
+let hay = "that4Ｕ,this4me1plz";
+assert_eq!(
+    re.find_iter(hay).map(|m| &hay[m.span()]).collect::<Vec<_>>(),
+    vec![",this4", "me1"]
+);
+```
+
+## Balancing groups
+```
+use std::{cell::RefCell, rc::Rc};
+use ib_matcher::regex::cp::Regex;
+
+let count = Rc::new(RefCell::new(0));
+let re = Regex::builder()
+    .callback("open_quote", {
+        let count = count.clone();
+        move |input, at, push| {
+            if at < 2 || input.haystack()[at - 2] != b'\\' {
+                let mut count = count.borrow_mut();
+                *count += 1;
+                push(0);
+            }
+        }
+    })
+    .callback("close_quote", move |input, at, push| {
+        if at < 2 || input.haystack()[at - 2] != b'\\' {
+            let mut count = count.borrow_mut();
+            if *count > 0 {
+                push(0);
+            }
+            *count -= 1;
+        }
+    })
+    .build(r"'(open_quote).*?'(close_quote)")
+    .unwrap();
+let hay = r"'one' 'two\'three' 'four'";
+assert_eq!(
+    re.find_iter(hay).map(|m| &hay[m.span()]).collect::<Vec<_>>(),
+    vec!["'one'", r"'two\'three'", "'four'"]
+);
+```
+(In this simple example, just using `'([^'\\]+?|\\')*'` is actually enough, but there are more complex cases where balancing groups (or recursion/subroutines) are necessary.)
+*/
 /// # Synchronization and cloning
 ///
 /// In order to make the `Regex` API convenient, most of the routines hide
@@ -266,6 +384,9 @@ impl<'a> Regex<'a> {
     }))]
     pub fn builder(
         #[builder(field)] syntax: util::syntax::Config,
+        #[cfg(feature = "regex-callback")]
+        #[builder(field)]
+        callbacks: Vec<(String, Callback)>,
         #[builder(finish_fn)] hirs: Vec<Hir>,
         /// Thompson NFA config. Named `configure` to be compatible with [`regex_automata::meta::Builder`]. Although some fields are not supported and `utf8_empty` is named as `utf8` instead.
         #[builder(default)]
@@ -293,7 +414,24 @@ impl<'a> Regex<'a> {
             .configure(configure)
             .build_many_from_hir(&hirs)?
             .into();
-        nfa.patch_bytes_to_matchers(literals.len() as u8, |b| {
+        let count = literals.len();
+        #[cfg(feature = "regex-callback")]
+        let count = {
+            let mut count = count;
+            for (literal, callback) in callbacks {
+                for i in literals.iter().positions(|l| l == &literal) {
+                    nfa.patch_first_byte(i as u8, |next| {
+                        crate::regex::nfa::State::Callback {
+                            callback: callback.clone(),
+                            next,
+                        }
+                    });
+                    count -= 1;
+                }
+            }
+            count
+        };
+        nfa.patch_bytes_to_matchers(literals.len() as u8, count, |b| {
             // `shallow_clone()` requires `config` cannot be moved
             let config: MatchConfig<'static> =
                 unsafe { transmute(imp.config.shallow_clone()) };
@@ -336,6 +474,17 @@ impl<'a, S: builder::State> Builder<'a, S> {
     /// ```
     pub fn syntax(mut self, syntax: util::syntax::Config) -> Self {
         self.syntax = syntax;
+        self
+    }
+
+    /// Add a [custom matching callback](Regex#custom-matching-callbacks).
+    #[cfg(feature = "regex-callback")]
+    pub fn callback(
+        mut self,
+        literal: impl Into<String>,
+        callback: impl Fn(&Input, usize, &mut dyn FnMut(usize)) + 'static,
+    ) -> Self {
+        self.callbacks.push((literal.into(), Arc::new(callback)));
         self
     }
 
@@ -875,6 +1024,68 @@ mod tests {
         assert_eq!(
             re.try_find(&mut cache, "拼音搜索⭐葬送のフリーレン").unwrap(),
             Some(Match::must(0, 0..39)),
+        );
+    }
+
+    #[cfg(feature = "regex-callback")]
+    #[test]
+    fn callback() {
+        use std::{cell::RefCell, rc::Rc};
+
+        let re = Regex::builder()
+            .callback("ascii", |input, at, push| {
+                let haystack = &input.haystack()[at..];
+                if haystack.get(0).is_some_and(|c| c.is_ascii()) {
+                    push(1);
+                }
+            })
+            .build(r"(ascii)+\d(ascii)+")
+            .unwrap();
+        assert_eq!(re.find("that4Ｕ this4me"), Some(Match::must(0, 8..16)));
+
+        let count = Rc::new(RefCell::new(0));
+        let re = Regex::builder()
+            .callback("open_quote", {
+                let count = count.clone();
+                move |input, at, push| {
+                    if at < 2 || input.haystack()[at - 2] != b'\\' {
+                        let mut count = count.borrow_mut();
+                        *count += 1;
+                        push(0);
+                    }
+                }
+            })
+            .callback("close_quote", move |input, at, push| {
+                if at < 2 || input.haystack()[at - 2] != b'\\' {
+                    let mut count = count.borrow_mut();
+                    if *count > 0 {
+                        push(0);
+                    }
+                    *count -= 1;
+                }
+            })
+            // '([^'\\]+?|\\')*'
+            .build(r"'(open_quote).*?'(close_quote)")
+            .unwrap();
+        let hay = r"'one' 'two\'three' 'four'";
+        assert_eq!(
+            re.find_iter(hay).map(|m| &hay[m.span()]).collect::<Vec<_>>(),
+            vec!["'one'", r"'two\'three'", "'four'"]
+        );
+
+        let re = Regex::builder()
+            .callback("lookahead_is_ascii", |input, at, push| {
+                let haystack = &input.haystack()[at..];
+                if haystack.get(0).is_some_and(|c| c.is_ascii()) {
+                    push(0);
+                }
+            })
+            .build(r"(?-u)[\x00-\x7f]+?\d(lookahead_is_ascii)")
+            .unwrap();
+        let hay = "that4Ｕ,this4me1plz";
+        assert_eq!(
+            re.find_iter(hay).map(|m| &hay[m.span()]).collect::<Vec<_>>(),
+            vec![",this4", "me1"]
         );
     }
 }
