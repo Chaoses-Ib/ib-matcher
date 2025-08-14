@@ -64,6 +64,14 @@ pub enum PathSeparator {
 }
 
 impl PathSeparator {
+    fn os_desugar() -> Self {
+        if MAIN_SEPARATOR == '\\' {
+            PathSeparator::Windows
+        } else {
+            PathSeparator::Unix
+        }
+    }
+
     pub fn any_byte_except(&self) -> Hir {
         match self {
             // Hir::class(Class::Bytes(ClassBytes::new([
@@ -78,6 +86,15 @@ impl PathSeparator {
                 ClassBytesRange::new(b'/' + 1, b'\\' - 1),
                 ClassBytesRange::new(b'\\' + 1, u8::MAX),
             ]))),
+        }
+    }
+
+    pub fn with_complement_char(&self) -> Option<(char, char)> {
+        match self {
+            PathSeparator::Os => Self::os_desugar().with_complement_char(),
+            PathSeparator::Unix => Some(('/', '\\')),
+            PathSeparator::Windows => Some(('\\', '/')),
+            PathSeparator::Any => None,
         }
     }
 }
@@ -105,8 +122,31 @@ pub enum WildcardPathToken {
 /// Wildcard-only path glob syntax flavor, including `?`, `*` and `**`.
 ///
 /// Used by voidtools' Everything, etc.
+///
+/// Optional extensions:
+/// - [`complement_separator_as_glob_star`](ParseWildcardPathBuilder::complement_separator_as_glob_star)
 #[builder]
-pub fn parse_wildcard_path(#[builder(finish_fn)] pattern: &str, separator: PathSeparator) -> Hir {
+pub fn parse_wildcard_path(
+    #[builder(finish_fn)] pattern: &str,
+    separator: PathSeparator,
+    /// Replace `/` with `*\**` on Windows and vice versa on Unix.
+    ///
+    /// e.g. `xx/hj` can match `xxzl\sj\7yhj` (`学习资料\时间\7月合集` with pinyin match) on Windows.
+    #[builder(default)]
+    complement_separator_as_glob_star: bool,
+) -> Hir {
+    // Desugar
+    let buf;
+    let pattern = if let Some((separator, complement)) = complement_separator_as_glob_star
+        .then(|| separator.with_complement_char())
+        .flatten()
+    {
+        buf = pattern.replace(complement, &format!("*{}**", separator));
+        buf.as_str()
+    } else {
+        pattern
+    };
+
     let mut lex = WildcardPathToken::lexer(pattern);
     let mut hirs = Vec::new();
     while let Some(Ok(token)) = lex.next() {
@@ -201,5 +241,39 @@ mod tests {
             )
             .unwrap();
         assert!(re.is_match(r"C:\Windows\System32\拼音搜索.exe"));
+    }
+
+    #[test]
+    fn complement_separator_as_glob_star() {
+        let re = Regex::builder()
+            .build_from_hir(
+                parse_wildcard_path()
+                    .separator(PathSeparator::Windows)
+                    .complement_separator_as_glob_star(true)
+                    .call(r"xx/hj"),
+            )
+            .unwrap();
+        assert!(re.is_match(r"xxzl\sj\8yhj"));
+
+        let re = Regex::builder()
+            .build_from_hir(
+                parse_wildcard_path()
+                    .separator(PathSeparator::Unix)
+                    .complement_separator_as_glob_star(true)
+                    .call(r"xx\hj"),
+            )
+            .unwrap();
+        assert!(re.is_match(r"xxzl/sj/8yhj"));
+
+        let re = Regex::builder()
+            .ib(MatchConfig::builder().pinyin(Default::default()).build())
+            .build_from_hir(
+                parse_wildcard_path()
+                    .separator(PathSeparator::Windows)
+                    .complement_separator_as_glob_star(true)
+                    .call(r"xx/hj"),
+            )
+            .unwrap();
+        assert!(re.is_match(r"学习资料\时间\7月合集"));
     }
 }
