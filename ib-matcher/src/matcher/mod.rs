@@ -14,6 +14,7 @@ use crate::{
 };
 
 pub mod analyze;
+pub(crate) mod config;
 pub mod encoding;
 pub mod input;
 mod matches;

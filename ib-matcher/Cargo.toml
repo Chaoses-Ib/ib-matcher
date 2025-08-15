@@ -142,6 +142,16 @@ harness = false
 name = "analyze"
 harness = false
 
+[[bench]]
+name = "regex_cp"
+path = "benches/regex/cp.rs"
+harness = false
+
+[[bench]]
+name = "regex_lita"
+path = "benches/regex/lita.rs"
+harness = false
+
 [package.metadata.docs.rs]
 # We want to document all features.
 all-features = true

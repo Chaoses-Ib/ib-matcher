@@ -589,32 +589,24 @@ impl<'a, S: builder::State> Builder<'a, '_, S> {
         self.build_many_from_hir(hirs)
     }
 
-    /// Builds a `Regex` directly from many `Hir` expressions.
+    /// Builds a `Regex` directly from an `Hir` expression.
     ///
-    /// This is useful if you needed to parse pattern strings into `Hir`
-    /// expressions for other reasons (such as analysis or transformations).
-    /// This routine permits building a `Regex` directly from the `Hir`
-    /// expressions instead of first converting the `Hir` expressions back to
-    /// pattern strings.
+    /// This is useful if you needed to parse a pattern string into an `Hir`
+    /// for other reasons (such as analysis or transformations). This routine
+    /// permits building a `Regex` directly from the `Hir` expression instead
+    /// of first converting the `Hir` back to a pattern string.
     ///
     /// When using this method, any options set via [`Builder::syntax`] are
     /// ignored. Namely, the syntax options only apply when parsing a pattern
     /// string, which isn't relevant here.
     ///
     /// If there was a problem building the underlying regex matcher for the
-    /// given `Hir` expressions, then an error is returned.
-    ///
-    /// Note that unlike [`Builder::build_many`], this can only fail as a
-    /// result of building the underlying matcher. In that case, there is
-    /// no single `Hir` expression that can be isolated as a reason for the
-    /// failure. So if this routine fails, it's not possible to determine which
-    /// `Hir` expression caused the failure.
+    /// given `Hir`, then an error is returned.
     ///
     /// # Example
     ///
-    /// This example shows how one can hand-construct multiple `Hir`
-    /// expressions and build a single regex from them without doing any
-    /// parsing at all.
+    /// This example shows how one can hand-construct an `Hir` expression and
+    /// build a regex from it without doing any parsing at all.
     ///
     /// ```
     /// use ib_matcher::regex::{
@@ -623,26 +615,15 @@ impl<'a, S: builder::State> Builder<'a, '_, S> {
     /// };
     ///
     /// // (?Rm)^foo$
-    /// let hir1 = Hir::concat(vec![
+    /// let hir = Hir::concat(vec![
     ///     Hir::look(Look::StartCRLF),
     ///     Hir::literal("foo".as_bytes()),
     ///     Hir::look(Look::EndCRLF),
     /// ]);
-    /// // (?Rm)^bar$
-    /// let hir2 = Hir::concat(vec![
-    ///     Hir::look(Look::StartCRLF),
-    ///     Hir::literal("bar".as_bytes()),
-    ///     Hir::look(Look::EndCRLF),
-    /// ]);
     /// let re = Regex::builder()
-    ///     .build_many_from_hir(vec![hir1, hir2])?;
-    /// let hay = "\r\nfoo\r\nbar";
-    /// let got: Vec<Match> = re.find_iter(hay).collect();
-    /// let expected = vec![
-    ///     Match::must(0, 2..5),
-    ///     Match::must(1, 7..10),
-    /// ];
-    /// assert_eq!(expected, got);
+    ///     .build_from_hir(hir)?;
+    /// let hay = "\r\nfoo\r\n";
+    /// assert_eq!(Some(Match::must(0, 2..5)), re.find(hay));
     ///
     /// Ok::<(), Box<dyn std::error::Error>>(())
     /// ```

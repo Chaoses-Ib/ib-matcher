@@ -31,3 +31,15 @@ where
         }
     }
 }
+
+#[cfg(feature = "regex-automata")]
+impl<'h> From<crate::regex::Input<'h>> for Input<'h, str> {
+    #[inline]
+    fn from(input: crate::regex::Input<'h>) -> Self {
+        debug_assert!(str::from_utf8(input.haystack()).is_ok());
+        Input {
+            haystack: unsafe { std::mem::transmute(str::from_utf8_unchecked(input.haystack())) },
+            no_start: false,
+        }
+    }
+}

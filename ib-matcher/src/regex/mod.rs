@@ -589,6 +589,7 @@ These classes are based on the definitions provided in
 </pre>
 */
 pub mod cp;
+pub mod lita;
 pub mod nfa;
 #[cfg(feature = "regex-syntax")]
 pub mod syntax;

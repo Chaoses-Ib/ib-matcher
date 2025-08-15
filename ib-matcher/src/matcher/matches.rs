@@ -44,6 +44,13 @@ impl Match {
     }
 }
 
+#[cfg(feature = "regex-automata")]
+impl Into<crate::regex::Match> for Match {
+    fn into(self) -> crate::regex::Match {
+        crate::regex::Match::must(0, self.range())
+    }
+}
+
 pub trait OptionMatchExt: Sealed + Into<Option<Match>> + Sized {
     /// Mainly used for bytes to char units conversion.
     fn div(self, rhs: usize) -> Option<Match> {
