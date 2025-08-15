@@ -419,7 +419,11 @@ impl<'a> Regex<'a> {
 
         let mut imp = Arc::new(RegexI {
             re: MaybeUninit::uninit(),
-            config: ib,
+            config: {
+                let mut config = ib;
+                config.starts_with = true;
+                config
+            },
             _pin: PhantomPinned,
         });
 

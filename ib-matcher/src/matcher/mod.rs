@@ -50,7 +50,7 @@ pub struct MatchConfig<'a> {
 
     /// Only matches if the haystack starts with the pattern.
     #[builder(default = false)]
-    starts_with: bool,
+    pub(crate) starts_with: bool,
     /// Only matches if the haystack ends with the pattern.
     #[builder(default = false)]
     ends_with: bool,
@@ -104,8 +104,9 @@ struct PatternChar<'a> {
 /// API follows [`regex::Regex`](https://docs.rs/regex/latest/regex/struct.Regex.html).
 ///
 /// ## Performance
-/// - If you need to build [`IbMatcher`] multiple times, pass [`PinyinMatchConfigBuilder::data`] to the builder to avoid re-initializing the pinyin data every time.
+/// - If you need to build [`IbMatcher`] multiple times, pass [`PinyinMatchConfigBuilder::data`] to the builder or use [`PinyinMatchConfig::shallow_clone()`] to avoid re-initializing the pinyin data every time. Same for [`RomajiMatchConfig`].
 /// - For matching more than 1000 strings, enable [`IbMatcherBuilder::analyze`] to optimize the pattern further. (The analysis costs ~65us, equivalent to about 220~1100 matches.)
+/// - If you only need to call [`IbMatcher::test`] (or [`IbMatcher::test_and_try_for_each`]), set `starts_with` to improve performance.
 ///
 /// TODO: No-pinyin pattern optimization
 /// TODO: Anchors, `*_at`
