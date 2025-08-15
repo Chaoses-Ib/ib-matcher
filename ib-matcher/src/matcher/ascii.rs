@@ -1,4 +1,6 @@
-use aho_corasick::{Anchored, Input, StartKind};
+use std::iter;
+
+use aho_corasick::{automaton::Automaton, Anchored, StartKind};
 use bon::{bon, Builder};
 
 use crate::matcher::Match;
@@ -21,31 +23,58 @@ impl PlainMatchConfig {
 pub enum AsciiMatcher<const CHAR_LEN: usize = 1> {
     /// ASCII-only haystack with non-ASCII pattern optimization
     Fail,
+    AcDFA(AcDfaMatcher),
     /// - find_ascii_too_short: +170%
     ///   - TODO
     /// - is_match_ascii -50%
     /// - find_ascii -55%
     /// - build -60%, `build_analyze` -25%
     /// - Build size -837.5 KiB
+    #[cfg(feature = "perf-plain-ac")]
     Ac(AcMatcher),
-    #[cfg(feature = "perf-regex-plain")]
+    #[cfg(feature = "perf-plain-regex")]
     #[allow(unused)]
     Regex(regex::bytes::Regex),
 }
 
 use AsciiMatcher::*;
 
-pub struct AcMatcher {
+/// Almost the same as [`AcMatcher`], but without the `dyn` cost.
+pub(crate) struct AcDfaMatcher {
+    dfa: aho_corasick::dfa::DFA,
+    /// `dfa` also has `start_state`, but here has free space so anyway
+    starts_with: bool,
+    ends_with: bool,
+
+    /// For [`AsciiMatcher::test_single()`].
+    pattern: Vec<u8>,
+    case_insensitive: bool,
+}
+
+impl AcDfaMatcher {
+    #[inline]
+    pub fn input<'h>(&self, haystack: &'h [u8]) -> aho_corasick::Input<'h> {
+        aho_corasick::Input::new(haystack).anchored(if self.starts_with {
+            Anchored::Yes
+        } else {
+            Anchored::No
+        })
+    }
+}
+
+#[cfg(feature = "perf-plain-ac")]
+pub(crate) struct AcMatcher {
     ac: aho_corasick::AhoCorasick,
     /// `ac` also has `start_kind`, but here has free space so anyway
     starts_with: bool,
     ends_with: bool,
 }
 
+#[cfg(feature = "perf-plain-ac")]
 impl AcMatcher {
     #[inline]
-    pub fn input<'h>(&self, haystack: &'h [u8]) -> Input<'h> {
-        Input::new(haystack).anchored(if self.starts_with {
+    pub fn input<'h>(&self, haystack: &'h [u8]) -> aho_corasick::Input<'h> {
+        aho_corasick::Input::new(haystack).anchored(if self.starts_with {
             Anchored::Yes
         } else {
             Anchored::No
@@ -69,8 +98,22 @@ impl<const CHAR_LEN: usize> AsciiMatcher<CHAR_LEN> {
                 //     .case_insensitive(case_insensitive)
                 //     .build()
                 //     .unwrap(),
-                Ac(AcMatcher {
-                    ac: aho_corasick::AhoCorasick::builder()
+
+                // Ac(AcMatcher {
+                //     ac: aho_corasick::AhoCorasick::builder()
+                //         .ascii_case_insensitive(plain.case_insensitive)
+                //         .start_kind(if starts_with {
+                //             StartKind::Anchored
+                //         } else {
+                //             StartKind::Unanchored
+                //         })
+                //         .build(&[pattern])
+                //         .unwrap(),
+                //     starts_with,
+                //     ends_with,
+                // })
+                AcDFA(AcDfaMatcher {
+                    dfa: aho_corasick::dfa::DFA::builder()
                         .ascii_case_insensitive(plain.case_insensitive)
                         .start_kind(if starts_with {
                             StartKind::Anchored
@@ -81,6 +124,12 @@ impl<const CHAR_LEN: usize> AsciiMatcher<CHAR_LEN> {
                         .unwrap(),
                     starts_with,
                     ends_with,
+                    pattern: if plain.case_insensitive {
+                        pattern.to_ascii_lowercase()
+                    } else {
+                        pattern.into()
+                    },
+                    case_insensitive: plain.case_insensitive,
                 })
             }
             None => Fail,
@@ -90,6 +139,36 @@ impl<const CHAR_LEN: usize> AsciiMatcher<CHAR_LEN> {
     pub fn find(&self, haystack: &[u8]) -> Option<Match> {
         match self {
             Fail => None,
+            AcDFA(ac) => {
+                if ac.ends_with {
+                    let start = if ac.starts_with {
+                        0
+                    } else {
+                        haystack.len().saturating_sub(ac.dfa.max_pattern_len())
+                    };
+                    ac.dfa
+                        .try_find_iter(ac.input(&haystack[start..]))
+                        // Only if Anchored doesn't match
+                        .unwrap()
+                        .filter(|m| start + m.end() == haystack.len())
+                        .map(|m| Match {
+                            start: start + m.start() / CHAR_LEN,
+                            end: start + m.end() / CHAR_LEN,
+                            is_pattern_partial: false,
+                        })
+                        .next()
+                } else {
+                    ac.dfa
+                        .try_find(&ac.input(haystack))
+                        .unwrap()
+                        .map(|m| Match {
+                            start: m.start() / CHAR_LEN,
+                            end: m.end() / CHAR_LEN,
+                            is_pattern_partial: false,
+                        })
+                }
+            }
+            #[cfg(feature = "perf-plain-ac")]
             Ac(ac) => {
                 if ac.ends_with {
                     let start = if ac.starts_with {
@@ -114,7 +193,7 @@ impl<const CHAR_LEN: usize> AsciiMatcher<CHAR_LEN> {
                     })
                 }
             }
-            #[cfg(feature = "perf-regex-plain")]
+            #[cfg(feature = "perf-plain-regex")]
             Regex(regex) => regex.find(haystack).map(|m| Match {
                 start: m.start() / CHAR_LEN,
                 end: m.end() / CHAR_LEN,
@@ -126,6 +205,17 @@ impl<const CHAR_LEN: usize> AsciiMatcher<CHAR_LEN> {
     pub fn is_match(&self, haystack: &[u8]) -> bool {
         match self {
             Fail => false,
+            AcDFA(ac) => {
+                if ac.ends_with {
+                    self.find(haystack).is_some()
+                } else {
+                    ac.dfa
+                        .try_find(&ac.input(haystack).earliest(true))
+                        .unwrap()
+                        .is_some()
+                }
+            }
+            #[cfg(feature = "perf-plain-ac")]
             Ac(ac) => {
                 if ac.ends_with {
                     self.find(haystack).is_some()
@@ -133,17 +223,75 @@ impl<const CHAR_LEN: usize> AsciiMatcher<CHAR_LEN> {
                     ac.ac.is_match(ac.input(haystack))
                 }
             }
-            #[cfg(feature = "perf-regex-plain")]
+            #[cfg(feature = "perf-plain-regex")]
             Regex(regex) => regex.is_match(haystack),
         }
+    }
+
+    /// ~15% faster than [`AsciiMatcher::AcDFA`]
+    #[inline(always)]
+    fn test_single(
+        &self,
+        pattern: &[u8],
+        ends_with: bool,
+        case_insensitive: bool,
+        haystack: &[u8],
+    ) -> Option<Match> {
+        let hay = haystack.get(..pattern.len())?;
+        if ends_with && pattern.len() != haystack.len() {
+            return None;
+        }
+        if if case_insensitive {
+            // haystack.eq_ignore_ascii_case(&pattern)
+            // TODO: Case map?
+            iter::zip(pattern, hay).all(|(&a, b)| a == b.to_ascii_lowercase())
+        } else {
+            hay == pattern
+        } {
+            return Some(Match {
+                start: 0,
+                end: pattern.len() / CHAR_LEN,
+                is_pattern_partial: false,
+            });
+        }
+        None
     }
 
     pub fn test(&self, haystack: &[u8]) -> Option<Match> {
         match self {
             Fail => None,
+            AcDFA(ac) => {
+                // // TODO: Always use anchored?
+                // let hay = haystack.get(..ac.dfa.max_pattern_len())?;
+                // let input = ac.input(hay);
+                // if ac.ends_with {
+                //     ac.dfa
+                //         .try_find(&input)
+                //         .unwrap()
+                //         .filter(|m| m.start() == 0 && m.end() == haystack.len())
+                //         .map(|m| Match {
+                //             start: 0,
+                //             end: m.end() / CHAR_LEN,
+                //             is_pattern_partial: false,
+                //         })
+                // } else {
+                //     ac.dfa
+                //         .try_find(&input)
+                //         .unwrap()
+                //         .filter(|m| m.start() == 0)
+                //         .map(|m| Match {
+                //             start: 0,
+                //             end: m.end() / CHAR_LEN,
+                //             is_pattern_partial: false,
+                //         })
+                // }
+                self.test_single(&ac.pattern, ac.ends_with, ac.case_insensitive, haystack)
+            }
+            #[cfg(feature = "perf-plain-ac")]
             Ac(ac) => {
                 // TODO: Always use anchored?
-                let input = ac.input(haystack);
+                let hay = haystack.get(..ac.ac.max_pattern_len())?;
+                let input = ac.input(hay);
                 if ac.ends_with {
                     ac.ac
                         .find(input)
@@ -162,9 +310,9 @@ impl<const CHAR_LEN: usize> AsciiMatcher<CHAR_LEN> {
                 }
             }
             // TODO: Use regex-automata's anchored searches?
-            #[cfg(feature = "perf-regex-plain")]
+            #[cfg(feature = "perf-plain-regex")]
             Regex(regex) => regex
-                .find(haystack.as_bytes())
+                .find(haystack)
                 .filter(|m| m.start() == 0)
                 .map(|m| Match {
                     start: 0,

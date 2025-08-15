@@ -74,10 +74,11 @@ perf-inline = ["regex-automata?/perf-inline"]
 ## -37% match time, +38 KiB
 perf-unicode-case-map = ["ib-unicode/perf-case-map"]
 
+perf-plain-ac = []
 ## Not used at the moment.
 ## 
 ## Build size +837.5 KiB
-perf-regex-plain = ["dep:regex"]
+perf-plain-regex = ["dep:regex"]
 
 #! ### FFI
 ## Make [`pinyin::PinyinData`] interior mutable. So it can be easily used as a `static` variable.
@@ -136,7 +137,6 @@ harness = false
 [[bench]]
 name = "ascii"
 harness = false
-# cargo bench --bench ascii --features perf-regex-plain
 
 [[bench]]
 name = "analyze"
