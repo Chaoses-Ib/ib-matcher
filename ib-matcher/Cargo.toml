@@ -134,9 +134,9 @@ name = "matcher"
 harness = false
 
 [[bench]]
-name = "regex"
+name = "ascii"
 harness = false
-# cargo bench --bench regex --features regex
+# cargo bench --bench ascii --features perf-regex-plain
 
 [[bench]]
 name = "analyze"
