@@ -1573,6 +1573,7 @@ impl BoundedBacktracker {
                     //     at += m.len();
                     // }
                     let mut first = true;
+                    // TODO: Avoid is_ascii every time
                     matcher.test_and_try_for_each(&haystack[at..], &mut |m| {
                         if first {
                             first = false;

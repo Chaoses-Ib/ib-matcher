@@ -44,6 +44,8 @@ You can also use [ib-pinyin](https://docs.rs/ib-pinyin/) if you only need Chines
 //! assert!(matcher.is_match("この素晴らしい世界に祝福を"));
 //! ```
 /*!
+See also [choosing a matcher](#choosing-a-matcher).
+
 ## Regular expression
 See [`regex`] module for more details. For example:
 ```
@@ -99,6 +101,27 @@ let re = Regex::builder()
 let hay = "that4Ｕ this4me";
 assert_eq!(&hay[re.find(hay).unwrap().span()], " this4me");
 ```
+
+## Choosing a matcher
+Use [`matcher::IbMatcher`] if:
+- You only need plain text matching, optionally with Unicode case insensitivity, Chinese pinyin match and Japanese romaji match.
+
+Use [`regex::lita::Regex`] if:
+- You need [`regex`] or [`glob`](syntax::glob) syntax.
+- You want high performance (and don't mind some binary footprint).
+
+  [`regex::lita::Regex`] can be much faster than [`regex::cp::Regex`], and slightly faster than the `regex` crate (due to enum dispatch) if the following conditions are met:
+  - Your pattern is often a literal string (i.e. plain text, optionally with pinyin/romaji match).
+  - A fair portion of your haystacks is ASCII-only.
+
+  A typical use case that meets the above conditions is matching file names and paths.
+
+Use [`regex::cp::Regex`] if:
+- You need [`regex`] or [`glob`](syntax::glob) syntax.
+- You need `find_iter()` or `captures_iter()`.
+- You need `build_many()`.
+- You need [custom matching callbacks](regex::cp::Regex#custom-matching-callbacks).
+- You want smaller binary size and don't very mind about the performance.
 */
 //! ## Performance
 //! The following `Cargo.toml` settings are recommended if best performance is desired:

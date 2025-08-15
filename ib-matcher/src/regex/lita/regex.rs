@@ -2,6 +2,7 @@ use std::sync::Arc;
 
 use bon::bon;
 use regex_automata::{
+    dfa::{self, dense},
     util::{captures::GroupInfo, primitives::NonMaxUsize},
     PatternID,
 };
@@ -172,8 +173,7 @@ pub struct Regex<'a> {
 #[derive(Clone)]
 enum RegexI<'a> {
     Ib(Arc<IbMatcherWithConfig<'a>>),
-    /// TODO: meta::Regex
-    Cp(cp::Regex<'a>),
+    Cp { dfa: dfa::regex::Regex, cp: cp::Regex<'a> },
 }
 
 #[bon]
@@ -203,7 +203,7 @@ impl<'a> Regex<'a> {
     /// lookm.set_line_terminator(b'\x00');
     /// let re = Regex::builder()
     ///     .syntax(syntax::Config::new().multi_line(true))
-    ///     .configure(Regex::config().look_matcher(lookm))
+    ///     .thompson(Regex::config().look_matcher(lookm))
     ///     .build(r"^foo$")?;
     /// let hay = "\x00foo\x00";
     /// assert_eq!(Some(Match::must(0, 1..4)), re.find(hay));
@@ -253,9 +253,12 @@ impl<'a> Regex<'a> {
     pub fn builder(
         #[builder(field)] syntax: util::syntax::Config,
         #[builder(finish_fn)] hir: Hir,
+        /// If the provided `hir` is Unicode-aware, providing a ASCII-aware-only `Hir` as `hir_ascii` can improve performance.
+        hir_ascii: Option<Hir>,
+        #[builder(default)] dfa_dense: dfa::dense::Config,
         /// Thompson NFA config. Named `configure` to be compatible with [`regex_automata::meta::Builder`]. Although some fields are not supported and `utf8_empty` is named as `utf8` instead.
         #[builder(default)]
-        configure: thompson::Config,
+        thompson: thompson::Config,
         /// [`IbMatcher`] config.
         #[builder(default = MatchConfig::builder().case_insensitive(false).build())]
         ib: MatchConfig<'a>,
@@ -292,15 +295,54 @@ impl<'a> Regex<'a> {
                 };
                 RegexI::Ib(IbMatcherWithConfig::with_config(pattern, ib))
             }
-            _ => RegexI::Cp(
-                cp::Regex::builder()
+            _ => {
+                let dfa = {
+                    // We can always forcefully disable captures because DFAs do not
+                    // support them.
+                    let thompson = thompson
+                        .clone()
+                        .which_captures(thompson::WhichCaptures::None);
+
+                    let mut compiler = thompson::Compiler::new();
+                    let hir = hir_ascii.as_ref().unwrap_or(&hir);
+
+                    let forward_nfa = compiler
+                        .configure(thompson.clone())
+                        .build_from_hir(hir)?;
+                    // TODO: prefilter
+                    // TODO: minimize?
+                    // TODO: quit vs is_ascii?
+                    let forward = dense::Builder::new()
+                        .configure(dfa_dense.clone())
+                        .build_from_nfa(&forward_nfa)
+                        .unwrap();
+
+                    let reverse_nfa = compiler
+                        .configure(thompson.reverse(true))
+                        .build_from_hir(hir)?;
+                    let reverse = dense::Builder::new()
+                        .configure(
+                            dfa_dense
+                                .prefilter(None)
+                                .specialize_start_states(false)
+                                .start_kind(dfa::StartKind::Anchored)
+                                .match_kind(regex_automata::MatchKind::All),
+                        )
+                        .build_from_nfa(&reverse_nfa)
+                        .unwrap();
+
+                    dfa::regex::Regex::builder()
+                        .build_from_dfas(forward, reverse)
+                };
+                let cp = cp::Regex::builder()
                     .syntax(syntax)
-                    .configure(configure)
+                    .configure(thompson)
                     .ib(ib)
                     .maybe_ib_parser(ib_parser)
                     .backtrack(backtrack)
-                    .build_from_hir(hir)?,
-            ),
+                    .build_from_hir(hir)?;
+                RegexI::Cp { dfa, cp }
+            }
         };
 
         Ok(Self { imp })
@@ -319,7 +361,7 @@ impl<'a> Regex<'a> {
     pub fn create_captures(&self) -> Captures {
         match &self.imp {
             RegexI::Ib(_) => Captures::matches(GroupInfo::empty()),
-            RegexI::Cp(cp) => cp.create_captures(),
+            RegexI::Cp { dfa: _, cp } => cp.create_captures(),
         }
     }
 }
@@ -373,21 +415,31 @@ impl<'a, S: builder::State> Builder<'a, '_, S> {
     /// ```
     pub fn build(self, pattern: &str) -> Result<Regex<'a>, BuildError>
     where
-        S: builder::IsComplete,
+        S::HirAscii: builder::IsUnset,
     {
         let syntax = self.syntax;
 
         // Parse
         let pattern = pattern.as_ref();
-        let hir = regex_automata::util::syntax::parse_with(pattern, &syntax)
-            .map_err(|_| {
-            // Shit
-            thompson::Compiler::new()
-                .syntax(syntax)
-                .build(pattern)
-                .unwrap_err()
-        })?;
-        self.build_from_hir(hir)
+        let parse_with = |syntax| {
+            regex_automata::util::syntax::parse_with(pattern, &syntax).map_err(
+                |_| {
+                    // Shit
+                    thompson::Compiler::new()
+                        .syntax(syntax)
+                        .build(pattern)
+                        .unwrap_err()
+                },
+            )
+        };
+        let hir_ascii = parse_with(
+            syntax
+                .unicode(false)
+                // ASCII must be valid UTF-8
+                .utf8(false),
+        )?;
+        let hir = parse_with(syntax)?;
+        self.hir_ascii(hir_ascii).build_from_hir(hir)
     }
 }
 
@@ -441,7 +493,7 @@ impl<'a> Regex<'a> {
     /// use ib_matcher::regex::{lita::Regex, Input, Match};
     ///
     /// let re = Regex::builder()
-    ///     .configure(Regex::config().utf8(false))
+    ///     .thompson(Regex::config().utf8(false))
     ///     .build("a*")?;
     ///
     /// assert!(re.is_match(Input::new("☃").span(1..2)));
@@ -473,7 +525,13 @@ impl<'a> Regex<'a> {
         let input = input.into().earliest(true);
         match &self.imp {
             RegexI::Ib(matcher) => matcher.is_match(input),
-            RegexI::Cp(re) => re.is_match(input),
+            RegexI::Cp { dfa, cp } => {
+                if input.haystack().is_ascii() {
+                    dfa.is_match(input)
+                } else {
+                    cp.is_match(input)
+                }
+            }
         }
     }
 
@@ -495,7 +553,13 @@ impl<'a> Regex<'a> {
         let input = input.into();
         match &self.imp {
             RegexI::Ib(matcher) => matcher.find(input).map(Into::into),
-            RegexI::Cp(re) => re.find(input),
+            RegexI::Cp { dfa, cp } => {
+                if input.haystack().is_ascii() {
+                    dfa.find(input)
+                } else {
+                    cp.find(input)
+                }
+            }
         }
     }
 
@@ -539,7 +603,14 @@ impl<'a> Regex<'a> {
                 }
                 Ok(())
             }
-            RegexI::Cp(re) => re.captures(input, caps),
+            RegexI::Cp { dfa, cp } => {
+                if input.haystack().is_ascii() && !dfa.is_match(input.clone())
+                {
+                    caps.set_pattern(None);
+                    return Ok(());
+                }
+                cp.captures(input, caps)
+            }
         }
     }
 }

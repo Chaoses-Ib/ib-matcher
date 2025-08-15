@@ -1,11 +1,11 @@
 /*!
-A collection of syntax parsers for either [`IbMatcher`](crate::matcher::IbMatcher) or [`Regex`](crate::regex::cp::Regex).
+A collection of syntax parsers for either [`IbMatcher`](crate::matcher::IbMatcher) or [`regex`](crate::regex).
 
 ## glob()-style pattern matching syntax
 See [`glob`] for details. For example:
 ```
 // cargo add ib-matcher --features syntax-glob,regex
-use ib_matcher::{regex::cp::Regex, syntax::glob::{parse_wildcard_path, PathSeparator}};
+use ib_matcher::{regex::lita::Regex, syntax::glob::{parse_wildcard_path, PathSeparator}};
 
 let re = Regex::builder()
     .build_from_hir(

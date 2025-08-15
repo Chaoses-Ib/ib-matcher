@@ -3,7 +3,7 @@ glob()-style pattern matching syntax support.
 
 ```
 // cargo add ib-matcher --features syntax-glob,regex
-use ib_matcher::{regex::cp::Regex, syntax::glob::{parse_wildcard_path, PathSeparator}};
+use ib_matcher::{regex::lita::Regex, syntax::glob::{parse_wildcard_path, PathSeparator}};
 
 let re = Regex::builder()
     .build_from_hir(
@@ -28,7 +28,7 @@ assert!(re.is_match(r"C:\Windows\System32\notepad.exe"));
 ```
 use ib_matcher::{
     matcher::MatchConfig,
-    regex::cp::Regex,
+    regex::lita::Regex,
     syntax::glob::{parse_wildcard_path, PathSeparator}
 };
 
@@ -174,7 +174,7 @@ pub fn parse_wildcard_path(
 mod tests {
     use regex_syntax::ParserBuilder;
 
-    use crate::{matcher::MatchConfig, regex::cp::Regex};
+    use crate::{matcher::MatchConfig, regex::lita::Regex};
 
     use super::*;
 

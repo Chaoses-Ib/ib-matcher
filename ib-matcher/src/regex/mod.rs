@@ -9,7 +9,7 @@ and `n` is proportional to the size of the string being searched.
 
 [regular expression]: https://en.wikipedia.org/wiki/Regular_expression
 
-If you just want API documentation, then skip to the [`cp::Regex`] type.
+If you just want API documentation, then skip to the [`cp::Regex`] or [`lita::Regex`] type. See also [choosing a matcher](crate#choosing-a-matcher).
 
 Most of the API is the same as [`regex-automata`](https://docs.rs/regex-automata/), the regex engine used by [`regex`](https://docs.rs/regex/).
 
@@ -589,8 +589,11 @@ These classes are based on the definitions provided in
 </pre>
 */
 pub mod cp;
+#[cfg(feature = "regex-lita")]
 pub mod lita;
 pub mod nfa;
+#[cfg(feature = "regex-lita")]
+pub use regex_automata::dfa;
 #[cfg(feature = "regex-syntax")]
 pub mod syntax;
 pub mod util;

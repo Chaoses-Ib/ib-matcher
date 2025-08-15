@@ -18,7 +18,7 @@ assert!(matcher.is_match("pinyin") == false);
 
 ## With `Regex`
 ```
-use ib_matcher::{regex::cp::Regex, matcher::{MatchConfig, pattern::Pattern}};
+use ib_matcher::{regex::lita::Regex, matcher::{MatchConfig, pattern::Pattern}};
 
 let re = Regex::builder()
     .ib(MatchConfig::builder().pinyin(Default::default()).build())
@@ -33,7 +33,7 @@ assert!(re.is_match("pinyin") == false);
 ```
 use ib_matcher::{
     matcher::{MatchConfig, pattern::Pattern},
-    regex::cp::Regex,
+    regex::lita::Regex,
     syntax::glob::{parse_wildcard_path, PathSeparator}
 };
 
@@ -124,7 +124,7 @@ mod tests {
     use crate::{
         matcher::{IbMatcher, MatchConfig, PinyinMatchConfig},
         pinyin::PinyinNotation,
-        regex::cp::Regex,
+        regex::lita::Regex,
         syntax::glob::{parse_wildcard_path, PathSeparator},
     };
 

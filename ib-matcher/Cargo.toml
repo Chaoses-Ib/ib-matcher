@@ -47,10 +47,18 @@ syntax-glob = ["dep:logos", "regex-syntax"]
 syntax-ev = []
 
 #! ### Regular expression
-## Regular expression support. See [`regex`] for details. Equivalent to features `regex-automata,regex-syntax`.
-regex = ["regex-automata", "regex-syntax"]
+## Regular expression support. See [`regex`] for details.
+## 
+## Equivalent to features `regex-automata,regex-lita,regex-syntax`.
+regex = ["regex-automata", "regex-lita", "regex-syntax"]
 ## Regex engines.
 regex-automata = ["regex-automata/nfa-thompson", "alloc"]
+## Enables [`regex::lita`]. 
+regex-lita = [
+    "regex-automata",
+    "regex-automata/dfa-build",
+    "regex-automata/dfa-search",
+]
 ## Regex with [custom matching callbacks](regex::cp::Regex#custom-matching-callbacks).
 regex-callback = ["regex-automata"]
 ## Enables a dependency on `regex-syntax`. This makes APIs
@@ -116,10 +124,13 @@ widestring = { version = "1.0.2", optional = true }
 [dev-dependencies]
 criterion = "0.6"
 daachorse = "1"
-# To make doctest in `regex::backtrack` happy
 regex-automata = { version = "0.4", default-features = false, features = [
+    # To make doctest in `regex::backtrack` happy
     "nfa-backtrack",
     "perf-literal-multisubstring",
+    # Bench
+    "dfa",
+    "hybrid",
 ] }
 ib-matcher = { features = [
     "pinyin",
@@ -140,6 +151,11 @@ harness = false
 
 [[bench]]
 name = "analyze"
+harness = false
+
+[[bench]]
+name = "regex_ascii"
+path = "benches/regex/ascii.rs"
 harness = false
 
 [[bench]]
