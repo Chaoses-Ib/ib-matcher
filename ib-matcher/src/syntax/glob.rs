@@ -89,6 +89,10 @@ impl PathSeparator {
         matches!(self.desugar(), PathSeparator::Unix | PathSeparator::Any)
     }
 
+    pub fn is_windows_or_any(self) -> bool {
+        matches!(self.desugar(), PathSeparator::Windows | PathSeparator::Any)
+    }
+
     pub fn any_byte_except(&self) -> Hir {
         match self {
             // Hir::class(Class::Bytes(ClassBytes::new([
@@ -161,6 +165,26 @@ impl GlobStar {
     }
 }
 
+/// See [`GlobExtConfig`].
+#[derive(Logos, Debug, PartialEq)]
+enum GlobExtToken {
+    #[token("/")]
+    SepUnix,
+
+    #[token(r"\")]
+    SepWin,
+
+    #[token("//")]
+    TwoSepUnix,
+
+    #[token(r"\\")]
+    TwoSepWin,
+
+    /// Plain text.
+    #[regex(r"[^/\\]+")]
+    Text,
+}
+
 /// Support two seperators (`//`) or a complement separator (`\`) as a glob star (`*/**`).
 ///
 /// Optional extensions:
@@ -200,8 +224,8 @@ impl GlobExtConfig {
         }
     }
 
-    /// - `to_separator`: The separator the pattern should be desugared to.
-    pub fn desugar<'p>(&self, pattern: &'p str, to_separator: PathSeparator) -> Cow<'p, str> {
+    #[cfg(test)]
+    fn desugar_single<'p>(&self, pattern: &'p str, to_separator: PathSeparator) -> Cow<'p, str> {
         let mut pattern = Cow::Borrowed(pattern);
         if let Some((sep, star)) = self.two_separator_as_star {
             let star_pattern = star.to_pattern(to_separator);
@@ -221,13 +245,66 @@ impl GlobExtConfig {
                 PathSeparator::Os => unreachable!(),
                 PathSeparator::Unix => pattern.replace('/', star_pattern),
                 PathSeparator::Windows => pattern.replace('\\', star_pattern),
-                PathSeparator::Any => pattern
-                    .replace('/', star_pattern)
-                    .replace('\\', star_pattern),
+                PathSeparator::Any => {
+                    if to_separator.is_unix_or_any() {
+                        pattern
+                            .replace('/', star_pattern)
+                            .replace('\\', star_pattern)
+                    } else {
+                        pattern
+                            .replace('\\', star_pattern)
+                            .replace('/', star_pattern)
+                    }
+                }
             }
             .into();
         }
+        #[cfg(test)]
+        dbg!(&pattern);
         pattern
+    }
+
+    /// - `to_separator`: The separator the pattern should be desugared to.
+    pub fn desugar<'p>(&self, pattern: &'p str, to_separator: PathSeparator) -> Cow<'p, str> {
+        if self.two_separator_as_star.is_none() && self.separator_as_star.is_none() {
+            return Cow::Borrowed(pattern);
+        }
+        // TODO: desugar_single optimization?
+
+        let mut lex = GlobExtToken::lexer(&pattern);
+        let mut pattern = String::with_capacity(pattern.len());
+        let sep_unix = self
+            .separator_as_star
+            .filter(|(sep, _)| sep.is_unix_or_any())
+            .map(|(_, star)| star.to_pattern(to_separator))
+            .unwrap_or("/");
+        let sep_win = self
+            .separator_as_star
+            .filter(|(sep, _)| sep.is_windows_or_any())
+            .map(|(_, star)| star.to_pattern(to_separator))
+            .unwrap_or(r"\");
+        let two_sep_unix = self
+            .two_separator_as_star
+            .filter(|(sep, _)| sep.is_unix_or_any())
+            .map(|(_, star)| star.to_pattern(to_separator))
+            .unwrap_or("//");
+        let two_sep_win = self
+            .two_separator_as_star
+            .filter(|(sep, _)| sep.is_windows_or_any())
+            .map(|(_, star)| star.to_pattern(to_separator))
+            .unwrap_or(r"\\");
+        while let Some(Ok(token)) = lex.next() {
+            pattern.push_str(match token {
+                GlobExtToken::SepUnix => sep_unix,
+                GlobExtToken::SepWin => sep_win,
+                GlobExtToken::TwoSepUnix => two_sep_unix,
+                GlobExtToken::TwoSepWin => two_sep_win,
+                GlobExtToken::Text => lex.slice(),
+            });
+        }
+        #[cfg(test)]
+        dbg!(&pattern);
+        Cow::Owned(pattern)
     }
 }
 
@@ -368,6 +445,11 @@ mod tests {
             .separator_as_star(PathSeparator::Any, GlobStar::ToChild)
             .build();
 
+        assert_eq!(
+            ext.desugar_single(r"xx/hj", PathSeparator::Windows),
+            r"xx*\**hj"
+        );
+        assert_eq!(ext.desugar(r"xx/hj", PathSeparator::Windows), r"xx*\**hj");
         let re = Regex::builder()
             .build_from_hir(
                 parse_wildcard_path()
