@@ -15,6 +15,7 @@ use crate::{
     regex::{
         cp,
         nfa::{backtrack, thompson},
+        syntax,
         util::{self, captures::Captures},
         Input, Match, MatchError,
     },
@@ -256,7 +257,11 @@ impl<'a> Regex<'a> {
         #[builder(field)] syntax: util::syntax::Config,
         #[builder(finish_fn)] hir: Hir,
         /// If the provided `hir` is Unicode-aware, providing a ASCII-aware-only `Hir` as `hir_ascii` can improve performance.
-        hir_ascii: Option<Hir>,
+        ///
+        /// The second `bool` is whether the provided `hir_ascii` is case insensitive:
+        /// - If it's `false` but `ib.case_insensitive` is `true`, then `hir_ascii` will be converted to case insensitive. (Used by glob)
+        /// - If it's `true` but `ib.case_insensitive` is `false`, `build()` will panic.
+        hir_ascii: Option<(Hir, bool)>,
         #[builder(default)] dfa_dense: dfa::dense::Config,
         /// Thompson NFA config. Named `configure` to be compatible with [`regex_automata::meta::Builder`]. Although some fields are not supported and `utf8_empty` is named as `utf8` instead.
         #[builder(default)]
@@ -306,7 +311,23 @@ impl<'a> Regex<'a> {
                         .which_captures(thompson::WhichCaptures::None);
 
                     let mut compiler = thompson::Compiler::new();
-                    let hir = hir_ascii.as_ref().unwrap_or(&hir);
+                    let hir_buf;
+                    let (mut hir, hir_case_insensitive) = hir_ascii
+                        .as_ref()
+                        .map(|(hir, case)| (hir, *case))
+                        .unwrap_or((&hir, false));
+                    if let Some(plain) = &ib.plain {
+                        debug_assert!(
+                            !(hir_case_insensitive && !plain.case_insensitive)
+                        );
+                        if !hir_case_insensitive && plain.case_insensitive {
+                            hir_buf =
+                                syntax::case::hir_to_ascii_case_insensitive(
+                                    hir.clone(),
+                                );
+                            hir = &hir_buf;
+                        }
+                    }
 
                     let forward_nfa = compiler
                         .configure(thompson.clone())
@@ -436,12 +457,13 @@ impl<'a, S: builder::State> Builder<'a, '_, S> {
         };
         let hir_ascii = parse_with(
             syntax
+                // TODO: case_insensitive
                 .unicode(false)
                 // ASCII must be valid UTF-8
                 .utf8(false),
         )?;
         let hir = parse_with(syntax)?;
-        self.hir_ascii(hir_ascii).build_from_hir(hir)
+        self.hir_ascii((hir_ascii, false)).build_from_hir(hir)
     }
 }
 
@@ -709,6 +731,28 @@ mod tests {
             .build(r"δ")
             .unwrap();
         assert_eq!(Some(Match::must(0, 0..2)), re.find(r"Δ"));
+
+        let re = Regex::builder()
+            .ib(MatchConfig::builder().build())
+            .build("pro.*m")
+            .unwrap();
+        assert!(re
+            .is_match(r"C:\Program Files\Everything 1.5a\Everything64.exe？"));
+        assert!(
+            re.is_match(r"C:\Program Files\Everything 1.5a\Everything64.exe")
+        );
+
+        let re = Regex::builder()
+            .ib(MatchConfig::builder().build())
+            .build_from_hir(
+                glob::parse_wildcard_path()
+                    .separator(glob::PathSeparator::Windows)
+                    .call(r"pro*m"),
+            )
+            .unwrap();
+        assert!(
+            re.is_match(r"C:\Program Files\Everything 1.5a\Everything64.exe")
+        );
     }
 
     #[test]

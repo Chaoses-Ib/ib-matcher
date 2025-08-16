@@ -59,7 +59,7 @@ pub struct MatchConfig<'a> {
     ///
     /// Note empty pattern always match everything.
     #[builder(required, default = Some(PlainMatchConfig::builder().build()))]
-    plain: Option<PlainMatchConfig>,
+    pub(crate) plain: Option<PlainMatchConfig>,
     /// Allow to match a haystack with mixed languages, i.e. pinyin and romaji, at the same time.
     ///
     /// `true` may lead to unexpected matches, especially if [`PinyinNotation::AsciiFirstLetter`] is enabled, and also lower performance.
