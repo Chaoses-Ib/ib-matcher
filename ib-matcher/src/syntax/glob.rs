@@ -1,6 +1,12 @@
 /*!
 glob()-style pattern matching syntax support.
 
+Supported syntax:
+- [`parse_wildcard_path`]: `?`, `*` and `**`, optionally with [`GlobExtConfig`].
+*/
+//! - [`GlobExtConfig`]: Two seperators (`//`) or a complement separator (`\`) as a glob star (`*/**`).
+/*!
+## Example
 ```
 // cargo add ib-matcher --features syntax-glob,regex
 use ib_matcher::{regex::lita::Regex, syntax::glob::{parse_wildcard_path, PathSeparator}};
@@ -43,14 +49,14 @@ let re = Regex::builder()
 assert!(re.is_match(r"C:\Windows\System32\拼音搜索.exe"));
 ```
 */
-use std::path::MAIN_SEPARATOR;
+use std::{borrow::Cow, path::MAIN_SEPARATOR};
 
-use bon::builder;
+use bon::{builder, Builder};
 use logos::Logos;
 use regex_syntax::hir::{Class, ClassBytes, ClassBytesRange, Dot, Hir, Repetition};
 
 /// Defaults to [`PathSeparator::Os`].
-#[derive(Default)]
+#[derive(Default, Clone, Copy)]
 pub enum PathSeparator {
     /// `/` on Unix and `\` on Windows.
     #[default]
@@ -69,6 +75,13 @@ impl PathSeparator {
             PathSeparator::Windows
         } else {
             PathSeparator::Unix
+        }
+    }
+
+    fn desugar(self) -> Self {
+        match self {
+            PathSeparator::Os => Self::os_desugar(),
+            sep => sep,
         }
     }
 
@@ -99,6 +112,58 @@ impl PathSeparator {
     }
 }
 
+/// Support two seperators (`//`) or a complement separator (`\`) as a glob star (`*/**`).
+///
+/// Optional extensions:
+/// - [`two_separator_as_glob_star`](GlobExtConfigBuilder::two_separator_as_glob_star): `\\` as `*\**`.
+/// - [`complement_separator_as_glob_star`](GlobExtConfigBuilder::complement_separator_as_glob_star): `/` as `*\**`.
+#[derive(Builder, Default, Clone, Copy)]
+pub struct GlobExtConfig {
+    /// Replace `\\` with `*\**` on Windows and vice versa on Unix.
+    ///
+    /// Used by voidtools' Everything.
+    #[builder(default)]
+    two_separator_as_glob_star: bool,
+    /// Override the separator used by `two_separator_as_glob_star`, which is `/` on Unix and `\` on Windows by default.
+    ///
+    /// On Windows, you likely want to use [`PathSeparator::Any`].
+    two_separator_as_glob_star_separator: Option<PathSeparator>,
+    /// Replace `/` with `*\**` on Windows and vice versa on Unix.
+    ///
+    /// e.g. `xx/hj` can match `xxzl\sj\7yhj` (`学习资料\时间\7月合集` with pinyin match) on Windows.
+    #[builder(default)]
+    complement_separator_as_glob_star: bool,
+}
+
+impl GlobExtConfig {
+    pub fn desugar<'p>(&self, separator: PathSeparator, pattern: &'p str) -> Cow<'p, str> {
+        let mut pattern = Cow::Borrowed(pattern);
+        if self.two_separator_as_glob_star {
+            pattern = match self
+                .two_separator_as_glob_star_separator
+                .unwrap_or(separator)
+                .desugar()
+            {
+                PathSeparator::Os => unreachable!(),
+                PathSeparator::Unix => pattern.replace("//", "*/**"),
+                PathSeparator::Windows => pattern.replace(r"\\", r"*\**"),
+                PathSeparator::Any => pattern.replace("//", "*/**").replace(r"\\", r"*\**"),
+            }
+            .into();
+        }
+        if let Some((separator, complement)) = self
+            .complement_separator_as_glob_star
+            .then(|| separator.with_complement_char())
+            .flatten()
+        {
+            pattern = pattern
+                .replace(complement, &format!("*{}**", separator))
+                .into();
+        }
+        pattern
+    }
+}
+
 /// See [`parse_wildcard_path`].
 #[derive(Logos, Debug, PartialEq)]
 pub enum WildcardPathToken {
@@ -122,32 +187,16 @@ pub enum WildcardPathToken {
 /// Wildcard-only path glob syntax flavor, including `?`, `*` and `**`.
 ///
 /// Used by voidtools' Everything, etc.
-///
-/// Optional extensions:
-/// - [`complement_separator_as_glob_star`](ParseWildcardPathBuilder::complement_separator_as_glob_star)
 #[builder]
 pub fn parse_wildcard_path(
     #[builder(finish_fn)] pattern: &str,
     separator: PathSeparator,
-    /// Replace `/` with `*\**` on Windows and vice versa on Unix.
-    ///
-    /// e.g. `xx/hj` can match `xxzl\sj\7yhj` (`学习资料\时间\7月合集` with pinyin match) on Windows.
-    #[builder(default)]
-    complement_separator_as_glob_star: bool,
+    #[builder(default)] ext: GlobExtConfig,
 ) -> Hir {
     // Desugar
-    let buf;
-    let pattern = if let Some((separator, complement)) = complement_separator_as_glob_star
-        .then(|| separator.with_complement_char())
-        .flatten()
-    {
-        buf = pattern.replace(complement, &format!("*{}**", separator));
-        buf.as_str()
-    } else {
-        pattern
-    };
+    let pattern = ext.desugar(separator, pattern);
 
-    let mut lex = WildcardPathToken::lexer(pattern);
+    let mut lex = WildcardPathToken::lexer(&pattern);
     let mut hirs = Vec::new();
     while let Some(Ok(token)) = lex.next() {
         hirs.push(match token {
@@ -245,11 +294,15 @@ mod tests {
 
     #[test]
     fn complement_separator_as_glob_star() {
+        let ext = GlobExtConfig::builder()
+            .complement_separator_as_glob_star(true)
+            .build();
+
         let re = Regex::builder()
             .build_from_hir(
                 parse_wildcard_path()
                     .separator(PathSeparator::Windows)
-                    .complement_separator_as_glob_star(true)
+                    .ext(ext)
                     .call(r"xx/hj"),
             )
             .unwrap();
@@ -259,7 +312,7 @@ mod tests {
             .build_from_hir(
                 parse_wildcard_path()
                     .separator(PathSeparator::Unix)
-                    .complement_separator_as_glob_star(true)
+                    .ext(ext)
                     .call(r"xx\hj"),
             )
             .unwrap();
@@ -270,7 +323,7 @@ mod tests {
             .build_from_hir(
                 parse_wildcard_path()
                     .separator(PathSeparator::Windows)
-                    .complement_separator_as_glob_star(true)
+                    .ext(ext)
                     .call(r"xx/hj"),
             )
             .unwrap();

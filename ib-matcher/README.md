@@ -16,7 +16,8 @@ A multilingual, flexible and fast string and regex matcher, supports 拼音匹�
 - [Japanese romaji](https://en.wikipedia.org/wiki/Romanization_of_Japanese) matching (ローマ字検索)
   - Support characters with multiple readings (i.e. heteronyms, 同形異音語).
   - Support [Hepburn romanization system](https://en.wikipedia.org/wiki/Hepburn_romanization) only at the moment.
-- glob()-style pattern matching (i.e. `?`, `*` and `**`)
+- [glob()-style](https://docs.rs/ib-matcher/latest/ib_matcher/syntax/glob/) pattern matching (i.e. `?`, `*` and `**`)
+  - Support two seperators (`//`) or a complement separator (`\`) as a glob star (`*/**`).
 - [Regular expression](https://docs.rs/ib-matcher/latest/ib_matcher/regex/)
   - Support the same syntax as [`regex`](https://docs.rs/regex/), including wildcards, repetitions, alternations, groups, etc.
   - Support [custom matching callbacks](https://docs.rs/ib-matcher/latest/ib_matcher/regex/cp/struct.Regex.html#custom-matching-callbacks), which can be used to implement ad hoc look-around, backreferences, balancing groups/recursion/subroutines, combining domain-specific parsers, etc.
