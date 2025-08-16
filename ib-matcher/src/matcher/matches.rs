@@ -34,6 +34,17 @@ impl Match {
         self.is_pattern_partial
     }
 
+    /// Returns a new match with `offset` added to this match's `start` and `end`
+    /// values.
+    #[inline]
+    pub fn offset(&self, offset: usize) -> Match {
+        Match {
+            start: self.start + offset,
+            end: self.end + offset,
+            is_pattern_partial: self.is_pattern_partial,
+        }
+    }
+
     /// Mainly used for bytes to char units conversion.
     pub fn div(self, rhs: usize) -> Match {
         Match {

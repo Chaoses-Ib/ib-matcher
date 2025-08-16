@@ -21,7 +21,7 @@ pub fn criterion_benchmark(c: &mut Criterion) {
             "pyssEverything".as_bytes(),
             aho_corasick::Span { start: 0, end: 14 },
         );
-        dbg!(candidate);
+        dbg!(&candidate);
         assert!(candidate.into_option().is_some());
         c.bench_function("find_ascii_ac_prefilter_only", |b| {
             b.iter(|| {

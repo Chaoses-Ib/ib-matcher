@@ -9,7 +9,9 @@ use regex_automata::{
 use regex_syntax::hir::{Hir, HirKind};
 
 use crate::{
-    matcher::{config::IbMatcherWithConfig, pattern::Pattern, MatchConfig},
+    matcher::{
+        self, config::IbMatcherWithConfig, pattern::Pattern, MatchConfig,
+    },
     regex::{
         cp,
         nfa::{backtrack, thompson},
@@ -524,7 +526,9 @@ impl<'a> Regex<'a> {
     pub fn is_match<'h, I: Into<Input<'h>>>(&self, input: I) -> bool {
         let input = input.into().earliest(true);
         match &self.imp {
-            RegexI::Ib(matcher) => matcher.is_match(input),
+            RegexI::Ib(matcher) => {
+                matcher.is_match(matcher::input::Input::from_regex(&input))
+            }
             RegexI::Cp { dfa, cp } => {
                 if input.haystack().is_ascii() {
                     dfa.is_match(input)
@@ -552,7 +556,9 @@ impl<'a> Regex<'a> {
     pub fn find<'h, I: Into<Input<'h>>>(&self, input: I) -> Option<Match> {
         let input = input.into();
         match &self.imp {
-            RegexI::Ib(matcher) => matcher.find(input).map(Into::into),
+            RegexI::Ib(matcher) => matcher
+                .find(matcher::input::Input::from_regex(&input))
+                .map(|m| m.offset(input.start()).into()),
             RegexI::Cp { dfa, cp } => {
                 if input.haystack().is_ascii() {
                     dfa.find(input)
@@ -594,7 +600,10 @@ impl<'a> Regex<'a> {
         match &self.imp {
             RegexI::Ib(matcher) => {
                 let slots = caps.slots_mut();
-                if let Some(m) = matcher.find(input) {
+                if let Some(m) =
+                    matcher.find(matcher::input::Input::from_regex(&input))
+                {
+                    let m = m.offset(input.start());
                     slots[0] = NonMaxUsize::new(m.start());
                     slots[1] = NonMaxUsize::new(m.end());
                     caps.set_pattern(Some(PatternID::ZERO));
@@ -622,9 +631,39 @@ mod tests {
     use crate::{
         matcher::{PinyinMatchConfig, RomajiMatchConfig},
         pinyin::PinyinNotation,
+        syntax::glob,
     };
 
     use super::*;
+
+    #[test]
+    fn empty() {
+        let re = Regex::builder()
+            .ib(MatchConfig::builder()
+                .pinyin(PinyinMatchConfig::default())
+                .build())
+            .build("")
+            .unwrap();
+        assert_eq!(re.find("pyss"), Some(Match::must(0, 0..0)));
+        assert_eq!(re.find("apyss"), Some(Match::must(0, 0..0)));
+        assert_eq!(re.find("拼音搜索"), Some(Match::must(0, 0..0)));
+
+        let re = Regex::builder()
+            .ib(MatchConfig::builder()
+                .pinyin(PinyinMatchConfig::default())
+                .is_pattern_partial(true)
+                .analyze(true)
+                .build())
+            .build_from_hir(
+                glob::parse_wildcard_path()
+                    .separator(glob::PathSeparator::Windows)
+                    .call(""),
+            )
+            .unwrap();
+        assert_eq!(re.find("pyss"), Some(Match::must(0, 0..0)));
+        assert_eq!(re.find("apyss"), Some(Match::must(0, 0..0)));
+        assert_eq!(re.find("拼音搜索"), Some(Match::must(0, 0..0)));
+    }
 
     #[test]
     fn literal() {
@@ -642,6 +681,25 @@ mod tests {
         assert_eq!(re.find("拼音搜索"), Some(Match::must(0, 0..12)));
 
         assert_eq!(re.find("pyss"), Some(Match::must(0, 0..4)));
+
+        let re = Regex::builder()
+            .ib(MatchConfig::builder()
+                .pinyin(PinyinMatchConfig::default())
+                .is_pattern_partial(true)
+                .analyze(true)
+                .build())
+            .ib_parser(&mut |pattern| Pattern::parse_ev(&pattern).call())
+            .build_from_hir(
+                glob::parse_wildcard_path()
+                    .separator(glob::PathSeparator::Windows)
+                    .call("abcdef"),
+            )
+            .unwrap();
+        assert_eq!(re.find("pyss"), None);
+        assert_eq!(re.find("abcdef"), Some(Match::must(0, 0..6)));
+        assert_eq!(re.find("0abcdef"), Some(Match::must(0, 1..7)));
+        assert_eq!(re.find("#文档"), None);
+        assert_eq!(re.find("$$"), None);
     }
 
     #[test]
