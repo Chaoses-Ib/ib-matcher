@@ -85,6 +85,10 @@ impl PathSeparator {
         }
     }
 
+    pub fn is_unix_or_any(self) -> bool {
+        matches!(self.desugar(), PathSeparator::Unix | PathSeparator::Any)
+    }
+
     pub fn any_byte_except(&self) -> Hir {
         match self {
             // Hir::class(Class::Bytes(ClassBytes::new([
@@ -102,12 +106,57 @@ impl PathSeparator {
         }
     }
 
-    pub fn with_complement_char(&self) -> Option<(char, char)> {
+    // fn with_complement_char(&self) -> Option<(char, char)> {
+    //     match self {
+    //         PathSeparator::Os => Self::os_desugar().with_complement_char(),
+    //         PathSeparator::Unix => Some(('/', '\\')),
+    //         PathSeparator::Windows => Some(('\\', '/')),
+    //         PathSeparator::Any => None,
+    //     }
+    // }
+
+    /// The complement path separator of the current OS, i.e. `/` on Windows and `\` on Unix.
+    pub fn os_complement() -> PathSeparator {
+        if MAIN_SEPARATOR == '/' {
+            PathSeparator::Windows
+        } else {
+            PathSeparator::Unix
+        }
+    }
+}
+
+#[derive(Clone, Copy)]
+#[non_exhaustive]
+pub enum GlobStar {
+    /// i.e. `*`, only match within the current component.
+    Current,
+    /// i.e. `**`, match anywhere, from the current component to children.
+    Any,
+    /// i.e. `*/**`, match from the current component to and must to children.
+    ToChild,
+    /// i.e. `**/`, match from the current component to and must to the start of a child.
+    ToChildStart,
+}
+
+impl GlobStar {
+    pub fn to_pattern(&self, separator: PathSeparator) -> &'static str {
         match self {
-            PathSeparator::Os => Self::os_desugar().with_complement_char(),
-            PathSeparator::Unix => Some(('/', '\\')),
-            PathSeparator::Windows => Some(('\\', '/')),
-            PathSeparator::Any => None,
+            GlobStar::Current => "*",
+            GlobStar::Any => "**",
+            GlobStar::ToChild => {
+                if separator.is_unix_or_any() {
+                    "*/**"
+                } else {
+                    r"*\**"
+                }
+            }
+            GlobStar::ToChildStart => {
+                if separator.is_unix_or_any() {
+                    "**/"
+                } else {
+                    r"**\"
+                }
+            }
         }
     }
 }
@@ -115,50 +164,68 @@ impl PathSeparator {
 /// Support two seperators (`//`) or a complement separator (`\`) as a glob star (`*/**`).
 ///
 /// Optional extensions:
-/// - [`two_separator_as_glob_star`](GlobExtConfigBuilder::two_separator_as_glob_star): `\\` as `*\**`.
-/// - [`complement_separator_as_glob_star`](GlobExtConfigBuilder::complement_separator_as_glob_star): `/` as `*\**`.
+/// - [`two_separator_as_star`](GlobExtConfigBuilder::two_separator_as_star): `\\` as `*\**`.
+/// - [`separator_as_star`](GlobExtConfigBuilder::separator_as_star): `/` as `*\**`.
 #[derive(Builder, Default, Clone, Copy)]
 pub struct GlobExtConfig {
-    /// Replace `\\` with `*\**` on Windows and vice versa on Unix.
+    /// - `sep`: You likely want to use [`PathSeparator::Any`].
+    /// - `star`:
+    ///   - [`GlobStar::ToChild`]: Replace `\\` with `*\**` for Windows and vice versa for Unix.
     ///
     /// Used by voidtools' Everything.
-    #[builder(default)]
-    two_separator_as_glob_star: bool,
-    /// Override the separator used by `two_separator_as_glob_star`, which is `/` on Unix and `\` on Windows by default.
+    #[builder(with = |sep: PathSeparator, star: GlobStar| (sep, star))]
+    two_separator_as_star: Option<(PathSeparator, GlobStar)>,
+    /// - `sep`: You likely want to use [`PathSeparator::os_complement()`].
+    /// - `star`:
+    ///   - [`GlobStar::ToChild`]: Replace `/` with `*\**` for Windows and vice versa for Unix.
     ///
-    /// On Windows, you likely want to use [`PathSeparator::Any`].
-    two_separator_as_glob_star_separator: Option<PathSeparator>,
-    /// Replace `/` with `*\**` on Windows and vice versa on Unix.
+    ///     e.g. `xx/hj` can match `xxzl\sj\7yhj` (`学习资料\时间\7月合集` with pinyin match) for Windows.
+    ///   - [`GlobStar::ToChildStart`]: Replace `/` with `**\` for Windows and vice versa for Unix.
     ///
-    /// e.g. `xx/hj` can match `xxzl\sj\7yhj` (`学习资料\时间\7月合集` with pinyin match) on Windows.
-    #[builder(default)]
-    complement_separator_as_glob_star: bool,
+    ///     For example:
+    ///     - `foo/alice` can, but `foo/lice` can't match `foo\bar\alice` for Windows.
+    ///     - `xx/7y` can, but `xx/hj` can't match `xxzl\sj\7yhj` (`学习资料\时间\合集7月` with pinyin match) for Windows.
+    ///
+    /// Used by IbEverythingExt.
+    #[builder(with = |sep: PathSeparator, star: GlobStar| (sep, star))]
+    separator_as_star: Option<(PathSeparator, GlobStar)>,
 }
 
 impl GlobExtConfig {
-    pub fn desugar<'p>(&self, separator: PathSeparator, pattern: &'p str) -> Cow<'p, str> {
+    /// The config used by IbEverythingExt. Suitable for common use cases.
+    pub fn new_ev() -> Self {
+        GlobExtConfig {
+            two_separator_as_star: Some((PathSeparator::Any, GlobStar::ToChild)),
+            separator_as_star: Some((PathSeparator::os_complement(), GlobStar::ToChildStart)),
+        }
+    }
+
+    /// - `to_separator`: The separator the pattern should be desugared to.
+    pub fn desugar<'p>(&self, pattern: &'p str, to_separator: PathSeparator) -> Cow<'p, str> {
         let mut pattern = Cow::Borrowed(pattern);
-        if self.two_separator_as_glob_star {
-            pattern = match self
-                .two_separator_as_glob_star_separator
-                .unwrap_or(separator)
-                .desugar()
-            {
+        if let Some((sep, star)) = self.two_separator_as_star {
+            let star_pattern = star.to_pattern(to_separator);
+            pattern = match sep.desugar() {
                 PathSeparator::Os => unreachable!(),
-                PathSeparator::Unix => pattern.replace("//", "*/**"),
-                PathSeparator::Windows => pattern.replace(r"\\", r"*\**"),
-                PathSeparator::Any => pattern.replace("//", "*/**").replace(r"\\", r"*\**"),
+                PathSeparator::Unix => pattern.replace("//", star_pattern),
+                PathSeparator::Windows => pattern.replace(r"\\", star_pattern),
+                PathSeparator::Any => pattern
+                    .replace("//", star_pattern)
+                    .replace(r"\\", star_pattern),
             }
             .into();
         }
-        if let Some((separator, complement)) = self
-            .complement_separator_as_glob_star
-            .then(|| separator.with_complement_char())
-            .flatten()
-        {
-            pattern = pattern
-                .replace(complement, &format!("*{}**", separator))
-                .into();
+        if let Some((sep, star)) = self.separator_as_star {
+            let star_pattern = star.to_pattern(to_separator);
+            pattern = match sep.desugar() {
+                PathSeparator::Os => unreachable!(),
+                PathSeparator::Unix => pattern.replace('/', star_pattern),
+                PathSeparator::Windows => pattern.replace('\\', star_pattern),
+                PathSeparator::Any => pattern
+                    .replace('/', star_pattern)
+                    .replace('\\', star_pattern),
+            }
+            .into();
         }
         pattern
     }
@@ -190,11 +257,14 @@ pub enum WildcardPathToken {
 #[builder]
 pub fn parse_wildcard_path(
     #[builder(finish_fn)] pattern: &str,
+    /// The path separator used in the haystacks to be matched.
+    ///
+    /// Only have effect on `?` and `*`.
     separator: PathSeparator,
     #[builder(default)] ext: GlobExtConfig,
 ) -> Hir {
     // Desugar
-    let pattern = ext.desugar(separator, pattern);
+    let pattern = ext.desugar(pattern, separator);
 
     let mut lex = WildcardPathToken::lexer(&pattern);
     let mut hirs = Vec::new();
@@ -295,7 +365,7 @@ mod tests {
     #[test]
     fn complement_separator_as_glob_star() {
         let ext = GlobExtConfig::builder()
-            .complement_separator_as_glob_star(true)
+            .separator_as_star(PathSeparator::Any, GlobStar::ToChild)
             .build();
 
         let re = Regex::builder()
