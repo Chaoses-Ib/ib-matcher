@@ -82,6 +82,17 @@ pub fn criterion_benchmark(c: &mut Criterion) {
         b.iter(|| matcher.find(black_box(ascii_25)))
     });
 
+    {
+        let re = Regex::builder()
+            .ib(MatchConfig::builder()
+                .pinyin(PinyinMatchConfig::default())
+                .build())
+            .build(r"py[^\\]*ss")
+            .unwrap();
+        assert!(re.find(ascii_25).is_some());
+        c.bench_function("find_re", |b| b.iter(|| re.find(black_box(ascii_25))));
+    }
+
     c.bench_function("build", |b| {
         b.iter(|| {
             Regex::builder()

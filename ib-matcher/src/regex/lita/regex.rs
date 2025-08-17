@@ -268,7 +268,7 @@ impl<'a> Regex<'a> {
         thompson: thompson::Config,
         /// [`IbMatcher`] config.
         #[builder(default = MatchConfig::builder().case_insensitive(false).build())]
-        ib: MatchConfig<'a>,
+        mut ib: MatchConfig<'a>,
         /// `IbMatcher` pattern parser.
         ///
         /// ### Example
@@ -357,6 +357,10 @@ impl<'a> Regex<'a> {
                     dfa::regex::Regex::builder()
                         .build_from_dfas(forward, reverse)
                 };
+                if let Some(plain) = ib.plain.as_mut() {
+                    // -3.3%
+                    plain.maybe_ascii = false;
+                }
                 let cp = cp::Regex::builder()
                     .syntax(syntax)
                     .configure(thompson)

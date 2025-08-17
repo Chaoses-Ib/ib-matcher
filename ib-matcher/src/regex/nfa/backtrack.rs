@@ -1574,19 +1574,24 @@ impl BoundedBacktracker {
                     // }
                     let mut first = true;
                     // TODO: Avoid is_ascii every time
-                    matcher.test_and_try_for_each(&haystack[at..], &mut |m| {
-                        if first {
-                            first = false;
-                            sid = next;
-                            at += m.end();
-                        } else {
-                            cache.stack.push(Frame::Step {
-                                sid: next,
-                                at: at + m.end(),
-                            });
-                        }
-                        None::<()>
-                    });
+                    // - [x] lita
+                    // - [ ] Cache
+                    matcher.test_and_try_for_each_opt::<true, _>(
+                        &haystack[at..],
+                        &mut |m| {
+                            if first {
+                                first = false;
+                                sid = next;
+                                at += m.end();
+                            } else {
+                                cache.stack.push(Frame::Step {
+                                    sid: next,
+                                    at: at + m.end(),
+                                });
+                            }
+                            None::<()>
+                        },
+                    );
                     if first {
                         return None;
                     }

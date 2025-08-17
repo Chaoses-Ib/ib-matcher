@@ -11,11 +11,17 @@ pub struct PlainMatchConfig {
     /// The case insensitivity of pinyin is controlled by [`PinyinMatchConfigBuilder::case_insensitive`].
     #[builder(default = true)]
     pub(crate) case_insensitive: bool,
+
+    #[builder(default = true, setters(vis = "pub(crate)"))]
+    pub(crate) maybe_ascii: bool,
 }
 
 impl PlainMatchConfig {
     pub(crate) fn case_insensitive(case_insensitive: bool) -> Option<Self> {
-        Some(Self { case_insensitive })
+        Some(Self {
+            case_insensitive,
+            maybe_ascii: true,
+        })
     }
 }
 

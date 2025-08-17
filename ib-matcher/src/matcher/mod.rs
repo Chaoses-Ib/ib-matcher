@@ -442,6 +442,17 @@ where
     where
         HaystackStr: 'h,
     {
+        self.test_and_try_for_each_opt::<false, T>(input, f)
+    }
+
+    pub(crate) fn test_and_try_for_each_opt<'h, const CONF_MAYBE_ASCII: bool, T>(
+        &self,
+        input: impl Into<Input<'h, HaystackStr>>,
+        f: &mut impl FnMut(Match) -> Option<T>,
+    ) -> Option<T>
+    where
+        HaystackStr: 'h,
+    {
         let input = input.into();
         let haystack = input.haystack;
         if self.is_haystack_too_short(haystack) || self.starts_with && input.no_start {
@@ -457,7 +468,10 @@ where
             }
         }
 
-        if haystack.is_ascii() {
+        if (!CONF_MAYBE_ASCII
+            || CONF_MAYBE_ASCII && self.plain.as_ref().is_some_and(|p| p.maybe_ascii))
+            && haystack.is_ascii()
+        {
             return self
                 .ascii
                 .test(haystack.as_bytes())
