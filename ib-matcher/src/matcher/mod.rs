@@ -69,6 +69,9 @@ pub struct MatchConfig<'a> {
     pinyin: Option<PinyinMatchConfig<'a>>,
     #[cfg(feature = "romaji")]
     romaji: Option<RomajiMatchConfig<'a>>,
+    #[cfg(not(any(feature = "pinyin", feature = "romaji")))]
+    #[builder(skip)]
+    _data: PhantomData<&'a ()>,
 }
 
 impl Default for MatchConfig<'_> {
@@ -87,8 +90,12 @@ impl<'a> MatchConfig<'a> {
             ends_with: self.ends_with,
             plain: self.plain.clone(),
             mix_lang: self.mix_lang,
+            #[cfg(feature = "pinyin")]
             pinyin: self.pinyin.as_ref().map(|c| c.shallow_clone()),
+            #[cfg(feature = "romaji")]
             romaji: self.romaji.as_ref().map(|c| c.shallow_clone()),
+            #[cfg(not(any(feature = "pinyin", feature = "romaji")))]
+            _data: PhantomData,
         }
     }
 }
@@ -673,6 +680,7 @@ where
     ///
     /// ## Returns
     /// (pinyin_matched, submatch)
+    #[cfg(any(feature = "pinyin", feature = "romaji"))]
     fn sub_test_pinyin<const LANG: u8, T>(
         &self,
         pattern: &[PatternChar],

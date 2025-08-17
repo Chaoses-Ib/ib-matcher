@@ -6,6 +6,9 @@ Supported syntax:
 */
 //! - [`GlobExtConfig`]: Two seperators (`//`) or a complement separator (`\`) as a glob star (`*/**`).
 /*!
+
+The following examples match glob syntax using [`ib_matcher::regex`](crate::regex) engines.
+
 ## Example
 ```
 // cargo add ib-matcher --features syntax-glob,regex

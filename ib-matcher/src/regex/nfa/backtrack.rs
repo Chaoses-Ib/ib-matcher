@@ -12,7 +12,7 @@ because it does less book-keeping.
 
 use alloc::{vec, vec::Vec};
 
-#[cfg(feature = "regex-syntax")]
+#[cfg(feature = "syntax-regex")]
 use regex_automata::nfa::thompson;
 use regex_automata::{
     nfa::thompson::{BuildError, State},
@@ -259,7 +259,7 @@ impl Config {
 #[derive(Clone, Debug)]
 pub struct Builder {
     config: Config,
-    #[cfg(feature = "regex-syntax")]
+    #[cfg(feature = "syntax-regex")]
     thompson: thompson::Compiler,
 }
 
@@ -268,7 +268,7 @@ impl Builder {
     pub fn new() -> Builder {
         Builder {
             config: Config::default(),
-            #[cfg(feature = "regex-syntax")]
+            #[cfg(feature = "syntax-regex")]
             thompson: thompson::Compiler::new(),
         }
     }
@@ -277,7 +277,7 @@ impl Builder {
     ///
     /// If there was a problem parsing or compiling the pattern, then an error
     /// is returned.
-    #[cfg(feature = "regex-syntax")]
+    #[cfg(feature = "syntax-regex")]
     pub fn build(
         &self,
         pattern: &str,
@@ -286,7 +286,7 @@ impl Builder {
     }
 
     /// Build a `BoundedBacktracker` from the given patterns.
-    #[cfg(feature = "regex-syntax")]
+    #[cfg(feature = "syntax-regex")]
     pub fn build_many<P: AsRef<str>>(
         &self,
         patterns: &[P],
@@ -326,7 +326,7 @@ impl Builder {
     ///
     /// These settings only apply when constructing a `BoundedBacktracker`
     /// directly from a pattern.
-    #[cfg(feature = "regex-syntax")]
+    #[cfg(feature = "syntax-regex")]
     pub fn syntax(
         &mut self,
         config: regex_automata::util::syntax::Config,
@@ -343,7 +343,7 @@ impl Builder {
     ///
     /// These settings only apply when constructing a `BoundedBacktracker`
     /// directly from a pattern.
-    #[cfg(feature = "regex-syntax")]
+    #[cfg(feature = "syntax-regex")]
     pub fn thompson(&mut self, config: thompson::Config) -> &mut Builder {
         self.thompson.configure(config);
         self
@@ -459,7 +459,7 @@ impl BoundedBacktracker {
     /// );
     /// # Ok::<(), Box<dyn std::error::Error>>(())
     /// ```
-    #[cfg(feature = "regex-syntax")]
+    #[cfg(feature = "syntax-regex")]
     pub fn new(pattern: &str) -> Result<BoundedBacktracker, BuildError> {
         BoundedBacktracker::builder().build(pattern)
     }
@@ -488,7 +488,7 @@ impl BoundedBacktracker {
     /// assert_eq!(None, it.next());
     /// # Ok::<(), Box<dyn std::error::Error>>(())
     /// ```
-    #[cfg(feature = "regex-syntax")]
+    #[cfg(feature = "syntax-regex")]
     pub fn new_many<P: AsRef<str>>(
         patterns: &[P],
     ) -> Result<BoundedBacktracker, BuildError> {
@@ -1952,7 +1952,7 @@ fn div_ceil(lhs: usize, rhs: usize) -> usize {
 
 #[cfg(test)]
 mod tests {
-    #[cfg(feature = "regex-syntax")]
+    #[cfg(feature = "syntax-regex")]
     use super::*;
 
     // This is a regression test for the maximum haystack length computation.
@@ -1961,7 +1961,7 @@ mod tests {
     // is of course no guarantee that this is true. This regression test
     // ensures that not only does `max_haystack_len` not panic, but that it
     // should return `0`.
-    #[cfg(feature = "regex-syntax")]
+    #[cfg(feature = "syntax-regex")]
     #[test]
     fn max_haystack_len_overflow() {
         let re = BoundedBacktracker::builder()

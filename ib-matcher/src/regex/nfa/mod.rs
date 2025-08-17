@@ -2,7 +2,7 @@ use core::ops::Deref;
 use std::{fmt::Debug, sync::Arc};
 
 use itertools::Itertools;
-#[cfg(feature = "regex-syntax")]
+#[cfg(feature = "syntax-regex")]
 use regex_automata::nfa::thompson::BuildError;
 use regex_automata::util::primitives::StateID;
 #[cfg(feature = "regex-callback")]
@@ -223,7 +223,7 @@ impl NFA {
     ///
     /// # Ok::<(), Box<dyn std::error::Error>>(())
     /// ```
-    #[cfg(feature = "regex-syntax")]
+    #[cfg(feature = "syntax-regex")]
     pub fn new(pattern: &str) -> Result<NFA, BuildError> {
         thompson::NFA::compiler().build(pattern).map(Into::into)
     }
@@ -248,7 +248,7 @@ impl NFA {
     ///
     /// # Ok::<(), Box<dyn std::error::Error>>(())
     /// ```
-    #[cfg(feature = "regex-syntax")]
+    #[cfg(feature = "syntax-regex")]
     pub fn new_many<P: AsRef<str>>(patterns: &[P]) -> Result<NFA, BuildError> {
         thompson::NFA::compiler().build_many(patterns).map(Into::into)
     }
@@ -380,6 +380,7 @@ pub(super) struct Inner {
     states: Vec<State>,
 }
 
+#[cfg(feature = "regex-callback")]
 pub type Callback = Arc<dyn Fn(&Input, usize, &mut dyn FnMut(usize))>;
 
 /// A state in an NFA.
@@ -511,9 +512,8 @@ mod tests {
     use regex_automata::Match;
 
     use crate::{
-        matcher::PinyinMatchConfig,
-        pinyin::PinyinNotation,
-        regex::{nfa::backtrack::BoundedBacktracker, syntax},
+        matcher::PinyinMatchConfig, pinyin::PinyinNotation,
+        regex::nfa::backtrack::BoundedBacktracker, syntax::regex as syntax,
     };
 
     use super::*;

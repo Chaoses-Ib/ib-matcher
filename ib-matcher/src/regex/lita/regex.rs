@@ -15,10 +15,10 @@ use crate::{
     regex::{
         cp,
         nfa::{backtrack, thompson},
-        syntax,
         util::{self, captures::Captures},
         Input, Match, MatchError,
     },
+    syntax::regex as syntax,
 };
 
 pub use crate::regex::nfa::{backtrack::Config, thompson::BuildError};
@@ -234,9 +234,9 @@ impl<'a> Regex<'a> {
     /// build a regex from it without doing any parsing at all.
     ///
     /// ```
-    /// use ib_matcher::regex::{
-    ///     lita::Regex, Match,
-    ///     syntax::hir::{Hir, Look},
+    /// use ib_matcher::{
+    ///     regex::{lita::Regex, Match},
+    ///     syntax::regex::hir::{Hir, Look},
     /// };
     ///
     /// // (?Rm)^foo$

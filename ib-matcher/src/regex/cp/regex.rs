@@ -20,10 +20,10 @@ use crate::{
             thompson::{self},
             NFA,
         },
-        syntax,
         util::{self, captures::Captures, pool::Pool},
         Input, Match, MatchError,
     },
+    syntax::regex as syntax,
 };
 
 pub use crate::regex::nfa::{
@@ -352,9 +352,9 @@ impl<'a> Regex<'a> {
     /// parsing at all.
     ///
     /// ```
-    /// use ib_matcher::regex::{
-    ///     cp::Regex, Match,
-    ///     syntax::hir::{Hir, Look},
+    /// use ib_matcher::{
+    ///     regex::{cp::Regex, Match},
+    ///     syntax::regex::hir::{Hir, Look},
     /// };
     ///
     /// // (?Rm)^foo$
@@ -613,9 +613,9 @@ impl<'a, S: builder::State> Builder<'a, '_, S> {
     /// build a regex from it without doing any parsing at all.
     ///
     /// ```
-    /// use ib_matcher::regex::{
-    ///     cp::Regex, Match,
-    ///     syntax::hir::{Hir, Look},
+    /// use ib_matcher::{
+    ///     regex::{cp::Regex, Match},
+    ///     syntax::regex::hir::{Hir, Look},
     /// };
     ///
     /// // (?Rm)^foo$

@@ -13,7 +13,14 @@ license.workspace = true
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [features]
-default = ["std", "perf", "romaji-compress-words", "regex-unicode"]
+#! Most used feature combinations:
+#! - Languages: `pinyin,romaji`
+#! - [glob](syntax::glob): `syntax-glob,regex`
+#! - Regex: `regex`
+#! - Regex with [custom matching callbacks](regex::cp::Regex#custom-matching-callbacks): `regex-callback`
+#! 
+#! Features:
+default = ["std", "unicode", "perf", "romaji-compress-words"]
 ## 
 ## - For [`regex`]:
 ## When enabled, this will cause `regex` to use the standard library. In terms
@@ -29,6 +36,8 @@ std = ["regex-automata?/std", "regex-syntax?/std", "logos?/std", "alloc"]
 alloc = ["regex-automata?/alloc"]
 
 #! ### Languages
+## Unicode support.
+unicode = ["regex-unicode"]
 ## Chinese pinyin match support.
 pinyin = ["dep:arraystring", "dep:bitflags"]
 ## Japanese romaji match support.
@@ -39,35 +48,41 @@ romaji = ["dep:ib-romaji"]
 romaji-compress-words = ["ib-romaji?/compress-words"]
 
 #! ### Syntax
-## Pattern syntax support. Include features `syntax-glob,syntax-ev`. See [`syntax`] for details.
+## Pattern syntax support. Equivalent to features `syntax-glob,syntax-ev`. See [`syntax`] for details.
 syntax = ["syntax-glob", "syntax-ev"]
 ## glob()-style pattern matching syntax support. See [`syntax::glob`] for details.
-syntax-glob = ["dep:logos", "regex-syntax"]
+syntax-glob = ["dep:logos", "syntax-regex"]
 ## Support for the syntax used by [IbEverythingExt](https://github.com/Chaoses-Ib/IbEverythingExt). See [`syntax::ev`] for details.
 syntax-ev = []
-
-#! ### Regular expression
-## Regular expression support. See [`regex`] for details.
-## 
-## Equivalent to features `regex-automata,regex-lita,regex-syntax`.
-regex = ["regex-automata", "regex-lita", "regex-syntax"]
-## Regex engines.
-regex-automata = ["regex-automata/nfa-thompson", "alloc"]
-## Enables [`regex::lita`]. 
-regex-lita = [
-    "regex-automata",
-    "regex-automata/dfa-build",
-    "regex-automata/dfa-search",
-]
-## Regex with [custom matching callbacks](regex::cp::Regex#custom-matching-callbacks).
-regex-callback = ["regex-automata"]
 ## Enables a dependency on `regex-syntax`. This makes APIs
 ## for building regex engines from pattern strings available. Without the
 ## `regex-syntax` dependency, the only way to build a regex engine is generally
 ## to deserialize a previously built DFA or to hand assemble an NFA using its
 ## [builder API](regex::nfa::thompson::Builder). Once you have an NFA, you can build any
 ## of the regex engines in this crate. The `syntax` feature also enables `alloc`.
-regex-syntax = ["dep:regex-syntax", "regex-automata?/syntax", "alloc"]
+##
+## See [`syntax::regex`] for details.
+syntax-regex = ["dep:regex-syntax", "regex-automata?/syntax", "alloc"]
+
+#! ### Regular expression engines
+## Regular expression support. See [`regex`] for details.
+## 
+## Include all regex features except `regex-unicode` (enabled by default) and `regex-callback`.
+regex = ["regex-cp", "regex-lita", "syntax-regex"]
+## Regex engine types.
+regex-automata = ["dep:regex-automata"]
+## Regex NFA engines.
+regex-nfa = ["regex-automata", "regex-automata/nfa-thompson", "alloc"]
+## Enables [`regex::cp`] engine. Include features `regex-nfa,syntax-regex`.
+regex-cp = ["regex-nfa", "syntax-regex"]
+## Regex with [custom matching callbacks](regex::cp::Regex#custom-matching-callbacks).
+regex-callback = ["regex-cp"]
+## Enables [`regex::lita`] engine. Include features `regex-cp`.
+regex-lita = [
+    "regex-cp",
+    "regex-automata/dfa-build",
+    "regex-automata/dfa-search",
+]
 ## Enables all regex Unicode features. This feature is enabled by default, and will
 ## always cover all Unicode features, even if more are added in the future.
 regex-unicode = ["regex-automata?/unicode", "regex-syntax?/unicode"]
@@ -138,7 +153,6 @@ ib-matcher = { features = [
     "syntax",
     "regex",
     "regex-callback",
-    "regex-syntax",
 ], path = "." }
 
 [[bench]]

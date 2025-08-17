@@ -1,5 +1,5 @@
 /*!
-A collection of syntax parsers for either [`IbMatcher`](crate::matcher::IbMatcher) or [`regex`](crate::regex).
+A collection of syntax parsers for either [`IbMatcher`](crate::matcher::IbMatcher) or [`regex`](crate::regex) engines.
 
 ## glob()-style pattern matching syntax
 See [`glob`] for details. For example:
@@ -33,6 +33,9 @@ let matcher = IbMatcher::builder(Pattern::parse_ev("pinyin;py").call())
 assert!(matcher.is_match("拼音搜索"));
 assert!(matcher.is_match("pinyin") == false);
 ```
+
+## Regular expression
+See [`regex`] for details.
 */
 
 #[cfg(feature = "syntax-glob")]
@@ -40,3 +43,6 @@ pub mod glob;
 
 #[cfg(feature = "syntax-ev")]
 pub mod ev;
+
+#[cfg(feature = "syntax-regex")]
+pub mod regex;

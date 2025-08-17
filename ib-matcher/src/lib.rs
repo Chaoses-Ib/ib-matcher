@@ -146,9 +146,13 @@ pub mod matcher;
 pub mod minimal;
 #[cfg(feature = "pinyin")]
 pub mod pinyin;
-#[cfg(any(feature = "regex-automata", feature = "regex-syntax"))]
+#[cfg(feature = "regex-automata")]
 pub mod regex;
-#[cfg(any(feature = "syntax-glob", feature = "syntax-ev"))]
+#[cfg(any(
+    feature = "syntax-glob",
+    feature = "syntax-ev",
+    feature = "syntax-regex"
+))]
 pub mod syntax;
 pub mod unicode;
 
