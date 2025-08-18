@@ -21,3 +21,46 @@ pub fn find_non_ascii_byte(b: &[u8]) -> Option<usize> {
     // sse2 (128) on x86_64, usize chunk on others
     bstr::ByteSlice::find_non_ascii_byte(b)
 }
+
+/// Search for the first occurrence of two possible bytes in a haystack.
+///
+/// This returns the index corresponding to the first occurrence of one of the
+/// needle bytes in `haystack`, or `None` if one is not found. If an index is
+/// returned, it is guaranteed to be less than `haystack.len()`.
+///
+/// While this is semantically the same as something like
+/// `haystack.iter().position(|&b| b == needle1 || b == needle2)`, this routine
+/// will attempt to use highly optimized vector operations that can be an order
+/// of magnitude faster (or more).
+///
+/// # Example
+///
+/// This shows how to find the first position of one of two possible bytes in a
+/// haystack.
+///
+/// ```
+/// use ib_unicode::ascii::find_byte2;
+///
+/// let haystack = b"the quick brown fox";
+/// assert_eq!(find_byte2(haystack, b'k', b'q'), Some(4));
+/// ```
+pub fn find_byte2(haystack: &[u8], needle1: u8, needle2: u8) -> Option<usize> {
+    #[cfg(not(feature = "perf-find"))]
+    return haystack.iter().position(|&b| b == needle1 || b == needle2);
+    #[cfg(feature = "perf-find")]
+    // sse2/avx2 (128) on x86_64
+    memchr::memchr2(needle1, needle2, haystack)
+}
+
+pub fn find_byte2_or_non_ascii_byte(haystack: &[u8], needle1: u8, needle2: u8) -> Option<usize> {
+    // TODO: Opt
+    match (
+        find_non_ascii_byte(haystack),
+        find_byte2(haystack, needle1, needle2),
+    ) {
+        (Some(m1), Some(m2)) => Some(m1.min(m2)),
+        (Some(m1), None) => Some(m1),
+        (None, Some(m2)) => Some(m2),
+        (None, None) => None,
+    }
+}

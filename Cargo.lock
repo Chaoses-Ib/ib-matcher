@@ -426,6 +426,7 @@ dependencies = [
  "bstr",
  "document-features",
  "ib-unicode",
+ "memchr",
 ]
 
 [[package]]
