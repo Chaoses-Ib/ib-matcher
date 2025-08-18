@@ -1,6 +1,6 @@
 [package]
 name = "ib-unicode"
-version = "0.1.0"
+version = "0.1.1"
 edition = "2021"
 description = "Unicode utils"
 keywords = ["unicode", "case"]
@@ -12,14 +12,20 @@ license.workspace = true
 default = []
 
 ## Enables all performance related features. This feature is intended to cover all reasonable features that improve performance, even if more are added in the future.
-perf = ["perf-case-map"]
+perf = ["perf-ascii", "perf-case-map"]
+## ASCII-related optimizations.
+perf-ascii = ["dep:bstr"]
 ## -37% match time, +38 KiB
 perf-case-map = []
 
 doc = ["dep:document-features"]
 
 [dependencies]
+bstr = { version = "1", default-features = false, optional = true }
 document-features = { version = "0.2.11", optional = true }
+
+[dev-dependencies]
+ib-unicode = { features = ["perf"], path = "." }
 
 [package.metadata.docs.rs]
 # We want to document all features.
