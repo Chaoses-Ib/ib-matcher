@@ -13,6 +13,7 @@ A multilingual, flexible and fast string and regex matcher, supports 拼音匹�
   - Support characters with multiple readings (i.e. heteronyms, 同形異音語).
   - Support [Hepburn romanization system](https://en.wikipedia.org/wiki/Hepburn_romanization) only at the moment.
 - [glob()-style](syntax::glob) pattern matching (i.e. `?`, `*` and `**`)
+  - Support [treating surrounding wildcards as anchors](syntax::glob#surrounding-wildcards-as-anchors) when not matching the whole string.
 */
 //!   - Support two seperators (`//`) or a complement separator (`\`) as a glob star (`*/**`).
 /*!

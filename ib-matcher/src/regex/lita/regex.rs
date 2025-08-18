@@ -293,6 +293,7 @@ impl<'a> Regex<'a> {
         dbg!(&hir);
 
         let imp = match hir.kind() {
+            // TODO: Look::{Start,End} optimization
             HirKind::Literal(literal) => {
                 let pattern = str::from_utf8(&literal.0).unwrap();
                 let pattern = if let Some(ib_parser) = ib_parser.as_mut() {

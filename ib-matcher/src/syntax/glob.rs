@@ -51,14 +51,32 @@ let re = Regex::builder()
     .unwrap();
 assert!(re.is_match(r"C:\Windows\System32\拼音搜索.exe"));
 ```
+
+## Anchor modes
+There are four possible anchor modes:
+- Matching from the start of the string. Used by terminal auto completion.
+- Matching from anywhere in the string. Used by this module.
+- Matching to the end of the string. Rarely used.
+- Matching the whole string (from the start to the end). Used by [voidtools' Everything](https://github.com/Chaoses-Ib/IbEverythingExt/issues/98).
+
+### Surrounding wildcards as anchors
+> TL;DR: When not matching the whole string, enabling [`surrounding_wildcard_as_anchor`](ParseWildcardPathBuilder::surrounding_wildcard_as_anchor) let patterns like `*.mp4` matches `v.mp4` but not `v.mp4_0.webp` (it matches both if disabled). And it's enabled by default.
+
+Besides matching the whole string, other anchor modes can have some duplicate patterns. For example, when matching from anywhere, `*.mp4` will match the same strings matched by `.mp4`; when matching from the start, `foo*` is the same as `foo`.
+
+These duplicate patterns have no syntax error, but matching them literally probably isn't what the user want. For example, `*.mp4` actually means the match must be to the end, `foo*` actually means the match must be from the start, otherwise the user would just type `.mp4` or `foo`. And the formers also cause worse match highlight (hightlighting the whole string isn't useful).
+
+To fix these problems, one way is to only match the whole string, another way is to treat leading and trailing wildcards differently. The user-side difference of them is how patterns like `a*b` are treated: the former requires `^a.*b$`, the latter allows `^.*a.*b.*$` (`*a*b*` in the former). The latter is more user-friendly (in my option) and can be converted to the former by adding anchor modes, so it's implemented here: [`surrounding_wildcard_as_anchor`](ParseWildcardPathBuilder::surrounding_wildcard_as_anchor), enabled by default.
+
+Related issue: [IbEverythingExt #98](https://github.com/Chaoses-Ib/IbEverythingExt/issues/98)
 */
 use std::{borrow::Cow, path::MAIN_SEPARATOR};
 
 use bon::{builder, Builder};
 use logos::Logos;
-use regex_syntax::hir::{Class, ClassBytes, ClassBytesRange, Dot, Hir, Repetition};
+use regex_syntax::hir::{Class, ClassBytes, ClassBytesRange, Dot, Hir, Look, Repetition};
 
-/// Defaults to [`PathSeparator::Os`].
+/// Defaults to [`PathSeparator::Os`], i.e. `/` on Unix and `\` on Windows.
 #[derive(Default, Clone, Copy)]
 pub enum PathSeparator {
     /// `/` on Unix and `\` on Windows.
@@ -341,6 +359,9 @@ pub fn parse_wildcard_path(
     ///
     /// Only have effect on `?` and `*`.
     separator: PathSeparator,
+    /// See [`surrounding wildcards as anchors`](super::glob#surrounding-wildcards-as-anchors).
+    #[builder(default = true)]
+    surrounding_wildcard_as_anchor: bool,
     #[builder(default)] ext: GlobExtConfig,
 ) -> Hir {
     // Desugar
@@ -348,7 +369,25 @@ pub fn parse_wildcard_path(
 
     let mut lex = WildcardPathToken::lexer(&pattern);
     let mut hirs = Vec::new();
+    let mut leading_wildcard = false;
+    let mut trailing_wildcard = false;
     while let Some(Ok(token)) = lex.next() {
+        if surrounding_wildcard_as_anchor
+            && matches!(
+                token,
+                WildcardPathToken::Any | WildcardPathToken::Star | WildcardPathToken::GlobStar
+            )
+        {
+            if hirs.is_empty() {
+                leading_wildcard = true;
+                continue;
+            }
+            if lex.remainder().is_empty() {
+                trailing_wildcard = true;
+                break;
+            }
+        }
+
         hirs.push(match token {
             WildcardPathToken::Any => separator.any_byte_except(),
             WildcardPathToken::Star => Hir::repetition(Repetition {
@@ -366,6 +405,15 @@ pub fn parse_wildcard_path(
             WildcardPathToken::Text => Hir::literal(lex.slice().as_bytes()),
         });
     }
+
+    if trailing_wildcard {
+        // Less used, reserving and replacing maybe not worth
+        hirs.insert(0, Hir::look(Look::Start));
+    }
+    if leading_wildcard {
+        hirs.push(Hir::look(Look::End))
+    }
+
     Hir::concat(hirs)
 }
 
@@ -405,7 +453,7 @@ mod tests {
         let hir2 = parse_wildcard_path()
             .separator(PathSeparator::Windows)
             .call("?a*b**c");
-        println!("{:?}", hir1);
+        println!("{:?}", hir2);
 
         assert_eq!(hir1, hir2);
 
@@ -483,5 +531,41 @@ mod tests {
             )
             .unwrap();
         assert!(re.is_match(r"学习资料\时间\7月合集"));
+    }
+
+    #[test]
+    fn surrounding_wildcard_as_anchor() {
+        let re = Regex::builder()
+            .build_from_hir(
+                parse_wildcard_path()
+                    .separator(PathSeparator::Windows)
+                    .call(r"*.mp4"),
+            )
+            .unwrap();
+        assert!(re.is_match(r"瑠璃の宝石.mp4"));
+        assert!(re.is_match(r"瑠璃の宝石.mp4_001947.296.webp") == false);
+
+        let re = Regex::builder()
+            .ib(MatchConfig::builder().pinyin(Default::default()).build())
+            .build_from_hir(
+                parse_wildcard_path()
+                    .separator(PathSeparator::Windows)
+                    .call(r"ll*"),
+            )
+            .unwrap();
+        assert!(re.is_match(r"瑠璃の宝石.mp4"));
+        assert!(re.is_match(r"ruri 瑠璃の宝石.mp4") == false);
+
+        let re = Regex::builder()
+            .ib(MatchConfig::builder().pinyin(Default::default()).build())
+            .build_from_hir(
+                parse_wildcard_path()
+                    .separator(PathSeparator::Windows)
+                    .call(r"ll*.mp4"),
+            )
+            .unwrap();
+        assert!(re.is_match(r"瑠璃の宝石.mp4"));
+        assert!(re.is_match(r"ruri 瑠璃の宝石.mp4"));
+        assert!(re.is_match(r"ruri 瑠璃の宝石.mp4_001133.937.webp"));
     }
 }
