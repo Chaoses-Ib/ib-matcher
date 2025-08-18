@@ -26,7 +26,12 @@ impl PlainMatchConfig {
 }
 
 /// For ASCII-only haystack optimization.
-pub enum AsciiMatcher<const CHAR_LEN: usize = 1> {
+pub struct AsciiMatcher<const CHAR_LEN: usize = 1> {
+    imp: AsciiMatcherImp<CHAR_LEN>,
+    first_byte: (u8, u8),
+}
+
+enum AsciiMatcherImp<const CHAR_LEN: usize> {
     /// ASCII-only haystack with non-ASCII pattern optimization
     Fail,
     AcDFA(AcDfaMatcher),
@@ -43,7 +48,7 @@ pub enum AsciiMatcher<const CHAR_LEN: usize = 1> {
     Regex(regex::bytes::Regex),
 }
 
-use AsciiMatcher::*;
+use AsciiMatcherImp::*;
 
 /// Almost the same as [`AcMatcher`], but without the `dyn` cost.
 pub(crate) struct AcDfaMatcher {
@@ -97,7 +102,7 @@ impl<const CHAR_LEN: usize> AsciiMatcher<CHAR_LEN> {
         #[builder(default = false)] starts_with: bool,
         #[builder(default = false)] ends_with: bool,
     ) -> Self {
-        match plain.filter(|_| pattern.is_ascii()) {
+        let imp = match plain.filter(|_| pattern.is_ascii()) {
             Some(plain) => {
                 // regex::bytes::RegexBuilder::new(&regex_utils::escape_bytes(pattern))
                 //     .unicode(false)
@@ -139,11 +144,27 @@ impl<const CHAR_LEN: usize> AsciiMatcher<CHAR_LEN> {
                 })
             }
             None => Fail,
-        }
+        };
+
+        // Or FF/FE?
+        // TODO: Mask?
+        let b = pattern.first().copied().unwrap_or(0);
+        let first_byte = if plain.as_ref().is_some_and(|plain| plain.case_insensitive) {
+            // Lowercase letters occur more often
+            if b.is_ascii_lowercase() {
+                (b, b.to_ascii_uppercase())
+            } else {
+                (b.to_ascii_lowercase(), b)
+            }
+        } else {
+            (b, b)
+        };
+
+        Self { imp, first_byte }
     }
 
     pub fn find(&self, haystack: &[u8]) -> Option<Match> {
-        match self {
+        match &self.imp {
             Fail => None,
             AcDFA(ac) => {
                 if ac.ends_with {
@@ -209,7 +230,7 @@ impl<const CHAR_LEN: usize> AsciiMatcher<CHAR_LEN> {
     }
 
     pub fn is_match(&self, haystack: &[u8]) -> bool {
-        match self {
+        match &self.imp {
             Fail => false,
             AcDFA(ac) => {
                 if ac.ends_with {
@@ -232,6 +253,11 @@ impl<const CHAR_LEN: usize> AsciiMatcher<CHAR_LEN> {
             #[cfg(feature = "perf-plain-regex")]
             Regex(regex) => regex.is_match(haystack),
         }
+    }
+
+    #[inline(always)]
+    pub fn test_first_byte(&self, b: u8) -> bool {
+        b == self.first_byte.0 || b == self.first_byte.1
     }
 
     /// ~15% faster than [`AsciiMatcher::AcDFA`]
@@ -264,7 +290,7 @@ impl<const CHAR_LEN: usize> AsciiMatcher<CHAR_LEN> {
     }
 
     pub fn test(&self, haystack: &[u8]) -> Option<Match> {
-        match self {
+        match &self.imp {
             Fail => None,
             AcDFA(ac) => {
                 // // TODO: Always use anchored?
