@@ -74,7 +74,26 @@ use std::{borrow::Cow, path::MAIN_SEPARATOR};
 
 use bon::{builder, Builder};
 use logos::Logos;
-use regex_syntax::hir::{Class, ClassBytes, ClassBytesRange, Dot, Hir, Look, Repetition};
+use regex_syntax::hir::{Class, ClassBytes, ClassBytesRange, Dot, Hir, Repetition};
+
+use util::SurroundingWildcardHandler;
+
+mod util;
+
+#[derive(Logos, Clone, Copy, Debug, PartialEq)]
+pub enum WildcardToken {
+    /// Equivalent to `.`.
+    #[token("?")]
+    Any,
+
+    /// Equivalent to `.*`.
+    #[token("*")]
+    Star,
+
+    /// Plain text.
+    #[regex("[^*?]+")]
+    Text,
+}
 
 /// Defaults to [`PathSeparator::Os`], i.e. `/` on Unix and `\` on Windows.
 #[derive(Default, Clone, Copy)]
@@ -330,7 +349,7 @@ impl GlobExtConfig {
 }
 
 /// See [`parse_wildcard_path`].
-#[derive(Logos, Debug, PartialEq)]
+#[derive(Logos, Clone, Copy, Debug, PartialEq)]
 pub enum WildcardPathToken {
     /// Equivalent to `[^/]` on Unix and `[^\\]` on Windows.
     #[token("?")]
@@ -347,6 +366,16 @@ pub enum WildcardPathToken {
     /// Plain text.
     #[regex("[^*?]+")]
     Text,
+}
+
+impl WildcardPathToken {
+    fn to_wildcard(self) -> WildcardToken {
+        match self {
+            WildcardPathToken::Any => WildcardToken::Any,
+            WildcardPathToken::Star | WildcardPathToken::GlobStar => WildcardToken::Star,
+            WildcardPathToken::Text => WildcardToken::Text,
+        }
+    }
 }
 
 /// Wildcard-only path glob syntax flavor, including `?`, `*` and `**`.
@@ -369,22 +398,12 @@ pub fn parse_wildcard_path(
 
     let mut lex = WildcardPathToken::lexer(&pattern);
     let mut hirs = Vec::new();
-    let mut leading_wildcard = false;
-    let mut trailing_wildcard = false;
+    let mut surrounding_handler =
+        surrounding_wildcard_as_anchor.then(SurroundingWildcardHandler::default);
     while let Some(Ok(token)) = lex.next() {
-        if surrounding_wildcard_as_anchor
-            && matches!(
-                token,
-                WildcardPathToken::Any | WildcardPathToken::Star | WildcardPathToken::GlobStar
-            )
-        {
-            if hirs.is_empty() {
-                leading_wildcard = true;
+        if let Some(h) = &mut surrounding_handler {
+            if h.skip(token.to_wildcard(), &hirs, &lex) {
                 continue;
-            }
-            if lex.remainder().is_empty() {
-                trailing_wildcard = true;
-                break;
             }
         }
 
@@ -406,12 +425,8 @@ pub fn parse_wildcard_path(
         });
     }
 
-    if trailing_wildcard {
-        // Less used, reserving and replacing maybe not worth
-        hirs.insert(0, Hir::look(Look::Start));
-    }
-    if leading_wildcard {
-        hirs.push(Hir::look(Look::End))
+    if let Some(h) = surrounding_handler {
+        h.insert_anchors(&mut hirs);
     }
 
     Hir::concat(hirs)
@@ -419,6 +434,7 @@ pub fn parse_wildcard_path(
 
 #[cfg(test)]
 mod tests {
+    use regex_automata::Match;
     use regex_syntax::ParserBuilder;
 
     use crate::{matcher::MatchConfig, regex::lita::Regex};
@@ -452,6 +468,7 @@ mod tests {
 
         let hir2 = parse_wildcard_path()
             .separator(PathSeparator::Windows)
+            .surrounding_wildcard_as_anchor(false)
             .call("?a*b**c");
         println!("{:?}", hir2);
 
@@ -535,6 +552,7 @@ mod tests {
 
     #[test]
     fn surrounding_wildcard_as_anchor() {
+        // Leading *
         let re = Regex::builder()
             .build_from_hir(
                 parse_wildcard_path()
@@ -545,6 +563,7 @@ mod tests {
         assert!(re.is_match(r"瑠璃の宝石.mp4"));
         assert!(re.is_match(r"瑠璃の宝石.mp4_001947.296.webp") == false);
 
+        // Trailing *
         let re = Regex::builder()
             .ib(MatchConfig::builder().pinyin(Default::default()).build())
             .build_from_hir(
@@ -554,8 +573,21 @@ mod tests {
             )
             .unwrap();
         assert!(re.is_match(r"瑠璃の宝石.mp4"));
+        assert_eq!(re.find(r"瑠璃の宝石.mp4"), Some(Match::must(0, 0..6)));
         assert!(re.is_match(r"ruri 瑠璃の宝石.mp4") == false);
 
+        let re = Regex::builder()
+            .ib(MatchConfig::builder().pinyin(Default::default()).build())
+            .build_from_hir(
+                parse_wildcard_path()
+                    .separator(PathSeparator::Windows)
+                    .call(r"ll***"),
+            )
+            .unwrap();
+        assert_eq!(re.find(r"瑠璃の宝石.mp4"), Some(Match::must(0, 0..6)));
+        assert!(re.is_match(r"ruri 瑠璃の宝石.mp4") == false);
+
+        // Middle *
         let re = Regex::builder()
             .ib(MatchConfig::builder().pinyin(Default::default()).build())
             .build_from_hir(
@@ -567,5 +599,28 @@ mod tests {
         assert!(re.is_match(r"瑠璃の宝石.mp4"));
         assert!(re.is_match(r"ruri 瑠璃の宝石.mp4"));
         assert!(re.is_match(r"ruri 瑠璃の宝石.mp4_001133.937.webp"));
+
+        // Leading ?
+        let re = Regex::builder()
+            .ib(MatchConfig::builder().pinyin(Default::default()).build())
+            .build_from_hir(
+                parse_wildcard_path()
+                    .separator(PathSeparator::Windows)
+                    .call(r"??.mp4"),
+            )
+            .unwrap();
+        assert_eq!(re.find(r"瑠璃の宝石.mp4"), Some(Match::must(0, 9..19)));
+
+        // Trailing ?
+        let re = Regex::builder()
+            .ib(MatchConfig::builder().pinyin(Default::default()).build())
+            .build_from_hir(
+                parse_wildcard_path()
+                    .separator(PathSeparator::Windows)
+                    .call(r"ll???"),
+            )
+            .unwrap();
+        assert_eq!(re.find(r"瑠璃の宝石.mp4"), Some(Match::must(0, 0..15)));
+        assert!(re.is_match(r"ruri 瑠璃の宝石.mp4") == false);
     }
 }
