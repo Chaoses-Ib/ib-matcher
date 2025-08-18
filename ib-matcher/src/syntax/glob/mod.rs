@@ -74,7 +74,9 @@ use std::{borrow::Cow, path::MAIN_SEPARATOR};
 
 use bon::{builder, Builder};
 use logos::Logos;
-use regex_syntax::hir::{Class, ClassBytes, ClassBytesRange, Dot, Hir, Repetition};
+use regex_syntax::hir::{
+    Class, ClassBytes, ClassBytesRange, ClassUnicode, ClassUnicodeRange, Dot, Hir, Repetition,
+};
 
 use util::SurroundingWildcardHandler;
 
@@ -146,6 +148,19 @@ impl PathSeparator {
                 ClassBytesRange::new(0, b'/' - 1),
                 ClassBytesRange::new(b'/' + 1, b'\\' - 1),
                 ClassBytesRange::new(b'\\' + 1, u8::MAX),
+            ]))),
+        }
+    }
+
+    pub fn any_char_except(&self) -> Hir {
+        match self {
+            PathSeparator::Os => Hir::dot(Dot::AnyCharExcept(MAIN_SEPARATOR)),
+            PathSeparator::Unix => Hir::dot(Dot::AnyCharExcept('/')),
+            PathSeparator::Windows => Hir::dot(Dot::AnyCharExcept('\\')),
+            PathSeparator::Any => Hir::class(Class::Unicode(ClassUnicode::new([
+                ClassUnicodeRange::new('\0', '.'),
+                ClassUnicodeRange::new('0', '['),
+                ClassUnicodeRange::new(']', char::MAX),
             ]))),
         }
     }
@@ -408,7 +423,7 @@ pub fn parse_wildcard_path(
         }
 
         hirs.push(match token {
-            WildcardPathToken::Any => separator.any_byte_except(),
+            WildcardPathToken::Any => separator.any_char_except(),
             WildcardPathToken::Star => Hir::repetition(Repetition {
                 min: 0,
                 max: None,
@@ -462,7 +477,7 @@ mod tests {
         let hir1 = ParserBuilder::new()
             .utf8(false)
             .build()
-            .parse(r"(?s-u)[^\\]a[^\\]*b.*c")
+            .parse(r"[^\\](?s-u)a[^\\]*b.*c")
             .unwrap();
         println!("{:?}", hir1);
 
