@@ -27,7 +27,12 @@ document-features = { version = "0.2.11", optional = true }
 memchr = { version = "2", optional = true }
 
 [dev-dependencies]
+criterion = "0.7"
 ib-unicode = { features = ["perf"], path = "." }
+
+[[bench]]
+name = "ascii"
+harness = false
 
 [package.metadata.docs.rs]
 # We want to document all features.

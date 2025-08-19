@@ -54,13 +54,24 @@ pub fn find_byte2(haystack: &[u8], needle1: u8, needle2: u8) -> Option<usize> {
 
 pub fn find_byte2_or_non_ascii_byte(haystack: &[u8], needle1: u8, needle2: u8) -> Option<usize> {
     // TODO: Opt
-    match (
-        find_non_ascii_byte(haystack),
-        find_byte2(haystack, needle1, needle2),
-    ) {
-        (Some(m1), Some(m2)) => Some(m1.min(m2)),
-        (Some(m1), None) => Some(m1),
-        (None, Some(m2)) => Some(m2),
-        (None, None) => None,
+    // match (
+    //     find_non_ascii_byte(haystack),
+    //     find_byte2(haystack, needle1, needle2),
+    // ) {
+    //     (Some(m1), Some(m2)) => Some(m1.min(m2)),
+    //     (Some(m1), None) => Some(m1),
+    //     (None, Some(m2)) => Some(m2),
+    //     (None, None) => None,
+    // }
+
+    // find_non_ascii_byte() is much faster than find_byte2() (2.3 vs 4.4ns)
+    if let Some(m) = find_non_ascii_byte(haystack) {
+        if let Some(m2) = find_byte2(unsafe { haystack.get_unchecked(..m) }, needle1, needle2) {
+            Some(m2)
+        } else {
+            Some(m)
+        }
+    } else {
+        find_byte2(haystack, needle1, needle2)
     }
 }
