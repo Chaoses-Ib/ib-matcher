@@ -3,6 +3,14 @@ glob()-style pattern matching syntax support.
 
 Supported syntax:
 - [`parse_wildcard_path`]: `?`, `*` and `**`, optionally with [`GlobExtConfig`].
+  - Windows file name safe.
+
+  Used by voidtools' Everything, etc.
+
+- [`parse_glob_path`]: `?`, `*`, `[]` and `**`, optionally with [`GlobExtConfig`].
+  - Parsing of `[]` is [fallible](#error-behavior).
+  - Not Windows file name safe: `[]` may disturb the matching of literal `[]` in file names.
+
 */
 //! - [`GlobExtConfig`]: Two seperators (`//`) or a complement separator (`\`) as a glob star (`*/**`).
 /*!
@@ -69,13 +77,66 @@ These duplicate patterns have no syntax error, but matching them literally proba
 To fix these problems, one way is to only match the whole string, another way is to treat leading and trailing wildcards differently. The user-side difference of them is how patterns like `a*b` are treated: the former requires `^a.*b$`, the latter allows `^.*a.*b.*$` (`*a*b*` in the former). The latter is more user-friendly (in my option) and can be converted to the former by adding anchor modes, so it's implemented here: [`surrounding_wildcard_as_anchor`](ParseWildcardPathBuilder::surrounding_wildcard_as_anchor), enabled by default.
 
 Related issue: [IbEverythingExt #98](https://github.com/Chaoses-Ib/IbEverythingExt/issues/98)
+
+## Character classes
+<!-- Support the same syntax as in [`regex`](crate::syntax::regex#character-classes), with `^` replaced by `!`. -->
+
+Support patterns like `[abc]`, `[a-z]`, `[!a-z]` and `[[:ascii:]]`.
+
+Character classes can be used to escape the metacharacter: `[?]`, `[*]`, `[[]`, `[]]` match the literal characters `?`, `*`, `[`, `]` respectively.
+
+### Error behavior
+Parsing of `[]` is fallible: patterns like `a[b` are invalid.
+
+At the moment related characters will be treated as literal characters if parsing fails.
+
+### Examples
+```
+# use ib_matcher::{syntax::glob::{parse_glob_path, PathSeparator}, regex::cp::Regex};
+# let is_match = |p, h| {
+#     Regex::builder()
+#         .build_from_hir(parse_glob_path().separator(PathSeparator::Windows).call(p))
+#         .unwrap()
+#         .is_match(h)
+# };
+// Set
+assert!(is_match("a[b]z", "abz"));
+assert!(is_match("a[b]z", "aBz") == false);
+assert!(is_match("a[bcd]z", "acz"));
+
+// Range
+assert!(is_match("a[b-z]z", "ayz"));
+
+// Negative set
+assert!(is_match("a[!b]z", "abz") == false);
+assert!(is_match("a[!b]z", "acz"));
+
+// ASCII character class
+assert!(is_match("a[[:space:]]z", "a z"));
+
+// Escape
+assert!(is_match("a[?]z", "a?z"));
+assert!(is_match("a[*]z", "a*z"));
+assert!(is_match("a[[]z", "a[z"));
+assert!(is_match("a[-]z", "a-z"));
+assert!(is_match("a[]]z", "a]z"));
+assert!(is_match(r"a[\d]z", r"a\z"));
+
+// Invalid patterns
+assert!(is_match("a[b", "a[bz"));
+assert!(is_match("a[[b]z", "a[[b]z"));
+assert!(is_match("a[!]z", "a[!]z"));
+```
 */
 use std::{borrow::Cow, path::MAIN_SEPARATOR};
 
 use bon::{builder, Builder};
 use logos::Logos;
-use regex_syntax::hir::{
-    Class, ClassBytes, ClassBytesRange, ClassUnicode, ClassUnicodeRange, Dot, Hir, Repetition,
+use regex_syntax::{
+    hir::{
+        Class, ClassBytes, ClassBytesRange, ClassUnicode, ClassUnicodeRange, Dot, Hir, Repetition,
+    },
+    ParserBuilder,
 };
 
 use util::SurroundingWildcardHandler;
@@ -447,6 +508,111 @@ pub fn parse_wildcard_path(
     Hir::concat(hirs)
 }
 
+/// See [`parse_glob_path`].
+#[derive(Logos, Clone, Copy, Debug, PartialEq)]
+pub enum GlobPathToken {
+    /// Equivalent to `[^/]` on Unix and `[^\\]` on Windows.
+    #[token("?")]
+    Any,
+
+    /// Equivalent to `[^/]*` on Unix and `[^\\]*` on Windows.
+    #[token("*")]
+    Star,
+
+    /// `[...]`.
+    #[regex(r"\[[^\]]+\]\]?")]
+    Class,
+
+    /// Equivalent to `.*`.
+    #[token("**")]
+    GlobStar,
+
+    /// Plain text.
+    #[regex(r"[^*?\[\]]+")]
+    Text,
+}
+
+impl GlobPathToken {
+    fn to_wildcard(self) -> WildcardToken {
+        match self {
+            GlobPathToken::Any => WildcardToken::Any,
+            GlobPathToken::Star | GlobPathToken::GlobStar => WildcardToken::Star,
+            GlobPathToken::Text | GlobPathToken::Class => WildcardToken::Text,
+        }
+    }
+}
+
+/// glob path syntax flavor, including `?`, `*`, `[]` and `**`.
+#[builder]
+pub fn parse_glob_path(
+    #[builder(finish_fn)] pattern: &str,
+    /// The path separator used in the haystacks to be matched.
+    ///
+    /// Only have effect on `?` and `*`.
+    separator: PathSeparator,
+    /// See [`surrounding wildcards as anchors`](super::glob#surrounding-wildcards-as-anchors).
+    #[builder(default = true)]
+    surrounding_wildcard_as_anchor: bool,
+    #[builder(default)] ext: GlobExtConfig,
+) -> Hir {
+    // Desugar
+    let pattern = ext.desugar(pattern, separator);
+
+    let mut lex = GlobPathToken::lexer(&pattern);
+    let mut hirs = Vec::new();
+    let mut surrounding_handler =
+        surrounding_wildcard_as_anchor.then(SurroundingWildcardHandler::default);
+    let mut parser = ParserBuilder::new().unicode(false).utf8(false).build();
+    while let Some(Ok(token)) = lex.next() {
+        if let Some(h) = &mut surrounding_handler {
+            if h.skip(token.to_wildcard(), &hirs, &lex) {
+                continue;
+            }
+        }
+
+        hirs.push(match token {
+            GlobPathToken::Any => separator.any_char_except(),
+            GlobPathToken::Star => Hir::repetition(Repetition {
+                min: 0,
+                max: None,
+                greedy: true,
+                sub: separator.any_byte_except().into(),
+            }),
+            GlobPathToken::GlobStar => Hir::repetition(Repetition {
+                min: 0,
+                max: None,
+                greedy: true,
+                sub: Hir::dot(Dot::AnyByte).into(),
+            }),
+            GlobPathToken::Class => {
+                let s = lex.slice();
+                match s {
+                    "[[]" => Hir::literal("[".as_bytes()),
+                    // "[!]" => Hir::literal("!".as_bytes()),
+                    _ => {
+                        // Life is short
+                        match parser.parse(&s.replace("[!", "[^").replace(r"\", r"\\")) {
+                            Ok(hir) => hir,
+                            Err(_e) => {
+                                #[cfg(test)]
+                                println!("{_e}");
+                                Hir::literal(s.as_bytes())
+                            }
+                        }
+                    }
+                }
+            }
+            GlobPathToken::Text => Hir::literal(lex.slice().as_bytes()),
+        });
+    }
+
+    if let Some(h) = surrounding_handler {
+        h.insert_anchors(&mut hirs);
+    }
+
+    Hir::concat(hirs)
+}
+
 #[cfg(test)]
 mod tests {
     use regex_automata::Match;
@@ -523,6 +689,44 @@ mod tests {
     }
 
     #[test]
+    fn glob_path() {
+        let is_match = |p, h| {
+            Regex::builder()
+                .build_from_hir(parse_glob_path().separator(PathSeparator::Windows).call(p))
+                .unwrap()
+                .is_match(h)
+        };
+
+        // Set
+        assert!(is_match("a[b]z", "abz"));
+        assert!(is_match("a[b]z", "aBz") == false);
+        assert!(is_match("a[bcd]z", "acz"));
+
+        // Range
+        assert!(is_match("a[b-z]z", "ayz"));
+
+        // Negative set
+        assert!(is_match("a[!b]z", "abz") == false);
+        assert!(is_match("a[!b]z", "acz"));
+
+        // ASCII character class
+        assert!(is_match("a[[:space:]]z", "a z"));
+
+        // Escape
+        assert!(is_match("a[?]z", "a?z"));
+        assert!(is_match("a[*]z", "a*z"));
+        assert!(is_match("a[[]z", "a[z"));
+        assert!(is_match("a[-]z", "a-z"));
+        assert!(is_match("a[]]z", "a]z"));
+        assert!(is_match(r"a[\d]z", r"a\z"));
+
+        // Invalid patterns
+        assert!(is_match("a[b", "a[bz"));
+        assert!(is_match("a[[b]z", "a[[b]z"));
+        assert!(is_match("a[!]z", "a[!]z"));
+    }
+
+    #[test]
     fn complement_separator_as_glob_star() {
         let ext = GlobExtConfig::builder()
             .separator_as_star(PathSeparator::Any, GlobStar::ToChild)
@@ -563,6 +767,22 @@ mod tests {
             )
             .unwrap();
         assert!(re.is_match(r"学习资料\时间\7月合集"));
+
+        // Trailing sep
+        let ext = GlobExtConfig::builder()
+            .separator_as_star(PathSeparator::Any, GlobStar::ToChildStart)
+            .build();
+        let re = Regex::builder()
+            .ib(MatchConfig::default())
+            .build_from_hir(
+                parse_wildcard_path()
+                    .separator(PathSeparator::Windows)
+                    .ext(ext)
+                    .call(r"xx/"),
+            )
+            .unwrap();
+        assert!(re.is_match(r"C:\Xxzl\sj\8yhj"));
+        assert!(re.is_match(r"C:\学习\Xxzl\sj\8yhj"));
     }
 
     #[test]

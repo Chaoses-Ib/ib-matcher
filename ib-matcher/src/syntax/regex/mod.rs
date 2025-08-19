@@ -40,6 +40,16 @@ Any named character class may appear inside a bracketed `[...]` character
 class. For example, `[\p{Greek}[:digit:]]` matches any ASCII digit or any
 codepoint in the `Greek` script. `[\p{Greek}&&\pL]` matches Greek letters.
 
+<div class="warning">
+
+Escaping:
+- `\` can escape the following metacharacter (but cannot escape a normal character).
+- `[]]` is valid and matches `]`, but `[[]` is invalid and will cause `unclosed character class` error (because classes are allowed to nest).
+- `[-]`, `[a-]` and `[-a]` are valid and can match `-`.
+- `[a^]` is valid and can match `^`, but `[^]` is not.
+- All other metacharacters are matched literally in `[]`, including `.`, `*`, `|` and `()`.
+</div>
+
 Precedence in character classes, from most binding to least:
 
 1. Ranges: `[a-cd]` == `[[a-c]d]`
