@@ -844,7 +844,8 @@ mod tests {
                     .call(r"??.mp4"),
             )
             .unwrap();
-        assert_eq!(re.find(r"瑠璃の宝石.mp4"), Some(Match::must(0, 9..19)));
+        assert_eq!(re.find(r"宝石.mp4"), Some(Match::must(0, 0..10)));
+        assert_eq!(re.find(r"瑠璃の宝石.mp4"), None);
 
         // Trailing ?
         let re = Regex::builder()
@@ -855,7 +856,7 @@ mod tests {
                     .call(r"ll???"),
             )
             .unwrap();
-        assert_eq!(re.find(r"瑠璃の宝石.mp4"), Some(Match::must(0, 0..15)));
-        assert!(re.is_match(r"ruri 瑠璃の宝石.mp4") == false);
+        assert_eq!(re.find(r"瑠璃の宝石"), Some(Match::must(0, 0..15)));
+        assert!(re.is_match(r"ruri 瑠璃の宝石") == false);
     }
 }
