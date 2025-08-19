@@ -20,10 +20,10 @@ use crate::{
             thompson::{self},
             NFA,
         },
-        util::{self, captures::Captures, pool::Pool},
+        util::{self, captures::Captures, pool::Pool, prefilter::PrefilterIb},
         Input, Match, MatchError,
     },
-    syntax::regex as syntax,
+    syntax::regex::{self as syntax, hir::literal::extract_first_byte},
 };
 
 pub use crate::regex::nfa::{
@@ -411,7 +411,7 @@ impl<'a> Regex<'a> {
         /// See [`crate::syntax::ev`] for more details.
         mut ib_parser: Option<&mut dyn FnMut(&str) -> Pattern<str>>,
         #[builder(default = backtrack::Config::new().visited_capacity(usize::MAX / 8))]
-        backtrack: backtrack::Config,
+        mut backtrack: backtrack::Config,
     ) -> Result<Self, BuildError> {
         _ = syntax;
         #[cfg(test)]
@@ -427,6 +427,11 @@ impl<'a> Regex<'a> {
             _pin: PhantomPinned,
         });
 
+        let case_insensitive =
+            imp.config.plain.as_ref().is_some_and(|p| p.case_insensitive);
+        #[cfg(feature = "perf-literal-substring")]
+        let mut first_byte = extract_first_byte(&hirs);
+
         // Copy-and-patch NFA
         let (hirs, literals) =
             syntax::fold::fold_literal_utf8(hirs.into_iter());
@@ -440,6 +445,9 @@ impl<'a> Regex<'a> {
             let mut count = count;
             for (literal, callback) in callbacks {
                 for i in literals.iter().positions(|l| l == &literal) {
+                    #[cfg(feature = "perf-literal-substring")]
+                    first_byte.take_if(|b| literal.as_bytes()[0] == *b);
+
                     nfa.patch_first_byte(i as u8, |next| {
                         crate::regex::nfa::State::Callback {
                             callback: callback.clone(),
@@ -468,6 +476,11 @@ impl<'a> Regex<'a> {
         dbg!(&nfa);
 
         // Engine
+        #[cfg(feature = "perf-literal-substring")]
+        if let Some(b) = first_byte {
+            backtrack.pre_ib =
+                Some(PrefilterIb::byte2_or_non_ascii(b, case_insensitive));
+        }
         let re = BoundedBacktracker::builder()
             .configure(backtrack)
             .build_from_nfa(nfa)?;
@@ -877,6 +890,7 @@ impl Deref for Regex<'_> {
 #[cfg(test)]
 mod tests {
     use regex_automata::Match;
+    use regex_syntax::hir::Look;
 
     use crate::{
         matcher::{PinyinMatchConfig, RomajiMatchConfig},
@@ -1033,6 +1047,28 @@ mod tests {
             re.try_find(&mut cache, "拼音搜索⭐葬送のフリーレン").unwrap(),
             Some(Match::must(0, 0..39)),
         );
+    }
+
+    #[test]
+    fn look() {
+        // (?Rm)^foo$
+        let hir1 = Hir::concat(vec![
+            Hir::look(Look::StartCRLF),
+            Hir::literal("foo".as_bytes()),
+            Hir::look(Look::EndCRLF),
+        ]);
+        // (?Rm)^bar$
+        let hir2 = Hir::concat(vec![
+            Hir::look(Look::StartCRLF),
+            Hir::literal("bar".as_bytes()),
+            Hir::look(Look::EndCRLF),
+        ]);
+        let re =
+            Regex::builder().build_many_from_hir(vec![hir1, hir2]).unwrap();
+        let hay = "\r\nfoo\r\nbar";
+        let got: Vec<Match> = re.find_iter(hay).collect();
+        let expected = vec![Match::must(0, 2..5), Match::must(1, 7..10)];
+        assert_eq!(expected, got);
     }
 
     #[cfg(feature = "regex-callback")]

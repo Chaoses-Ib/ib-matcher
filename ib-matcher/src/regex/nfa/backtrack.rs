@@ -25,7 +25,10 @@ use regex_automata::{
     Anchored, HalfMatch, Input, Match, MatchError, Span,
 };
 
-use crate::regex::{nfa::NFA, util::empty};
+use crate::regex::{
+    nfa::NFA,
+    util::{empty, prefilter::PrefilterIb},
+};
 
 /// Returns the minimum visited capacity for the given haystack.
 ///
@@ -53,6 +56,7 @@ pub fn min_visited_capacity(nfa: &NFA, input: &Input<'_>) -> usize {
 #[derive(Clone, Debug, Default)]
 pub struct Config {
     pre: Option<Option<Prefilter>>,
+    pub(crate) pre_ib: Option<PrefilterIb>,
     visited_capacity: Option<usize>,
 }
 
@@ -198,6 +202,7 @@ impl Config {
     pub(crate) fn overwrite(&self, o: Config) -> Config {
         Config {
             pre: o.pre.or_else(|| self.pre.clone()),
+            pre_ib: o.pre_ib.or_else(|| self.pre_ib.clone()),
             visited_capacity: o.visited_capacity.or(self.visited_capacity),
         }
     }
@@ -1404,8 +1409,26 @@ impl BoundedBacktracker {
             return Ok(self.backtrack(cache, input, at, start_id, slots));
         }
         let pre = self.get_config().get_prefilter();
+        #[cfg(feature = "perf-literal-substring")]
+        let pre_ib = self.get_config().pre_ib.as_ref();
         let mut at = input.start();
         while at <= input.end() {
+            #[cfg(feature = "perf-literal-substring")]
+            if let Some(pre_ib) = pre_ib {
+                match match *pre_ib {
+                    // -19.5% for regex_lita find_re
+                    PrefilterIb::Byte2OrNonAscii(a, b) => {
+                        ib_unicode::ascii::find_byte2_or_non_ascii_byte(
+                            &input.haystack()[at..input.end()],
+                            a,
+                            b,
+                        )
+                    }
+                } {
+                    None => break,
+                    Some(m) => at += m,
+                }
+            }
             if let Some(ref pre) = pre {
                 let span = Span::from(at..input.end());
                 match pre.find(input.haystack(), span) {

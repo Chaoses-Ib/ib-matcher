@@ -52,6 +52,7 @@ pub fn find_byte2(haystack: &[u8], needle1: u8, needle2: u8) -> Option<usize> {
     memchr::memchr2(needle1, needle2, haystack)
 }
 
+#[cfg_attr(feature = "perf-ascii", inline)]
 pub fn find_byte2_or_non_ascii_byte(haystack: &[u8], needle1: u8, needle2: u8) -> Option<usize> {
     // TODO: Opt
     // match (
