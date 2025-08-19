@@ -64,8 +64,13 @@ assert!(re.is_match(r"C:\Windows\System32\拼音搜索.exe"));
 There are four possible anchor modes:
 - Matching from the start of the string. Used by terminal auto completion.
 - Matching from anywhere in the string. Used by this module.
-- Matching to the end of the string. Rarely used.
+- Matching to the end of the string. Rarely used besides matching file extensions.
 - Matching the whole string (from the start to the end). Used by [voidtools' Everything](https://github.com/Chaoses-Ib/IbEverythingExt/issues/98).
+
+This module will match from anywhere in the string by default. For other modes:
+- To match from the start of the string only, you can append a `*` to the pattern (like `foo*`), which will then be consider as an anchor (by [`surrounding_wildcard_as_anchor`](ParseWildcardPathBuilder::surrounding_wildcard_as_anchor)).
+- To match the whole string only, you can combine the above one with checking the returned match length at the moment.
+- If you want to match to the end of the string, prepend a `*`, like `*.mp4`.
 
 ### Surrounding wildcards as anchors
 > TL;DR: When not matching the whole string, enabling [`surrounding_wildcard_as_anchor`](ParseWildcardPathBuilder::surrounding_wildcard_as_anchor) let patterns like `*.mp4` matches `v.mp4` but not `v.mp4_0.webp` (it matches both if disabled). And it's enabled by default.
@@ -77,6 +82,60 @@ These duplicate patterns have no syntax error, but matching them literally proba
 To fix these problems, one way is to only match the whole string, another way is to treat leading and trailing wildcards differently. The user-side difference of them is how patterns like `a*b` are treated: the former requires `^a.*b$`, the latter allows `^.*a.*b.*$` (`*a*b*` in the former). The latter is more user-friendly (in my option) and can be converted to the former by adding anchor modes, so it's implemented here: [`surrounding_wildcard_as_anchor`](ParseWildcardPathBuilder::surrounding_wildcard_as_anchor), enabled by default.
 
 Related issue: [IbEverythingExt #98](https://github.com/Chaoses-Ib/IbEverythingExt/issues/98)
+
+### Anchors in file paths
+> TL;DR: If you are matching file paths, you probably want to set `Regex::builder().thompson(PathSeparator::Windows.look_matcher_config())`.
+
+Another problem about anchored matching is, when matching file paths, should the anchors match the start/end of the whole path or the path components (i.e. match separators)?
+
+The default behavior is the former, for example:
+```
+use ib_matcher::{
+    matcher::MatchConfig,
+    regex::lita::Regex,
+    syntax::glob::{parse_wildcard_path, PathSeparator}
+};
+
+let re = Regex::builder()
+    .ib(MatchConfig::default())
+    .build_from_hir(
+        parse_wildcard_path()
+            .separator(PathSeparator::Windows)
+            .call(r"?\foo*\"),
+    )
+    .unwrap();
+assert!(re.is_match(r"C\foobar\⑨"));
+assert!(re.is_match(r"D\C\foobar\9") == false); // Doesn't match
+assert!(re.is_match(r"DC\foobar\9") == false);
+assert!(re.is_match(r"C\DC\foobar\9") == false);
+```
+
+If you want the latter behavior, i.e. special anchors that match `/` or `\` too, you need to set `look_matcher` in [`crate::regex::nfa::thompson::Config`], for example:
+```
+use ib_matcher::{
+    matcher::MatchConfig,
+    regex::lita::Regex,
+    syntax::glob::{parse_wildcard_path, PathSeparator}
+};
+
+let re = Regex::builder()
+    .ib(MatchConfig::default())
+    .thompson(PathSeparator::Windows.look_matcher_config())
+    .build_from_hir(
+        parse_wildcard_path()
+            .separator(PathSeparator::Windows)
+            .call(r"?\foo*\"),
+    )
+    .unwrap();
+assert!(re.is_match(r"C\foobar\⑨"));
+assert!(re.is_match(r"D\C\foobar\9")); // Now matches
+assert!(re.is_match(r"DC\foobar\9") == false);
+assert!(re.is_match(r"C\DC\foobar\9") == false);
+```
+
+The latter behavior is used by voidtools' Everything.
+
+Related issue: [IbEverythingExt #99](https://github.com/Chaoses-Ib/IbEverythingExt/issues/99)
 
 ## Character classes
 <!-- Support the same syntax as in [`regex`](crate::syntax::regex#character-classes), with `^` replaced by `!`. -->
@@ -132,6 +191,7 @@ use std::{borrow::Cow, path::MAIN_SEPARATOR};
 
 use bon::{builder, Builder};
 use logos::Logos;
+use regex_automata::{nfa::thompson, util::look::LookMatcher};
 use regex_syntax::{
     hir::{
         Class, ClassBytes, ClassBytesRange, ClassUnicode, ClassUnicodeRange, Dot, Hir, Repetition,
@@ -196,6 +256,18 @@ impl PathSeparator {
         matches!(self.desugar(), PathSeparator::Windows | PathSeparator::Any)
     }
 
+    fn literal(&self) -> Hir {
+        match self.desugar() {
+            PathSeparator::Os => unreachable!(),
+            PathSeparator::Unix => Hir::literal(*b"/"),
+            PathSeparator::Windows => Hir::literal(*b"\\"),
+            PathSeparator::Any => Hir::class(Class::Bytes(ClassBytes::new([
+                ClassBytesRange::new(b'/', b'/'),
+                ClassBytesRange::new(b'\\', b'\\'),
+            ]))),
+        }
+    }
+
     pub fn any_byte_except(&self) -> Hir {
         match self {
             // Hir::class(Class::Bytes(ClassBytes::new([
@@ -224,6 +296,20 @@ impl PathSeparator {
                 ClassUnicodeRange::new(']', char::MAX),
             ]))),
         }
+    }
+
+    /// Does not support `PathSeparator::Any` yet.
+    pub fn look_matcher(&self) -> LookMatcher {
+        debug_assert!(!matches!(self, PathSeparator::Any));
+
+        let mut lookm = LookMatcher::new();
+        lookm.set_line_terminator(if self.is_unix_or_any() { b'/' } else { b'\\' });
+        lookm
+    }
+
+    /// Does not support `PathSeparator::Any` yet.
+    pub fn look_matcher_config(&self) -> thompson::Config {
+        thompson::Config::new().look_matcher(self.look_matcher())
     }
 
     // fn with_complement_char(&self) -> Option<(char, char)> {
@@ -439,19 +525,15 @@ pub enum WildcardPathToken {
     #[token("**")]
     GlobStar,
 
-    /// Plain text.
-    #[regex("[^*?]+")]
-    Text,
-}
+    #[token("/")]
+    SepUnix,
 
-impl WildcardPathToken {
-    fn to_wildcard(self) -> WildcardToken {
-        match self {
-            WildcardPathToken::Any => WildcardToken::Any,
-            WildcardPathToken::Star | WildcardPathToken::GlobStar => WildcardToken::Star,
-            WildcardPathToken::Text => WildcardToken::Text,
-        }
-    }
+    #[token(r"\")]
+    SepWin,
+
+    /// Plain text.
+    #[regex(r"[^*?/\\]+")]
+    Text,
 }
 
 /// Wildcard-only path glob syntax flavor, including `?`, `*` and `**`.
@@ -460,6 +542,10 @@ impl WildcardPathToken {
 #[builder]
 pub fn parse_wildcard_path(
     #[builder(finish_fn)] pattern: &str,
+    /// The separator used in the pattern. Can be different from the one used in the haystacks to be matched.
+    ///
+    /// Defaults to the same as `separator`. You may want to use [`PathSeparator::Any`] instead.
+    pattern_separator: Option<PathSeparator>,
     /// The path separator used in the haystacks to be matched.
     ///
     /// Only have effect on `?` and `*`.
@@ -469,16 +555,18 @@ pub fn parse_wildcard_path(
     surrounding_wildcard_as_anchor: bool,
     #[builder(default)] ext: GlobExtConfig,
 ) -> Hir {
+    let pattern_separator = pattern_separator.unwrap_or(separator);
+
     // Desugar
     let pattern = ext.desugar(pattern, separator);
 
     let mut lex = WildcardPathToken::lexer(&pattern);
     let mut hirs = Vec::new();
     let mut surrounding_handler =
-        surrounding_wildcard_as_anchor.then(SurroundingWildcardHandler::default);
+        surrounding_wildcard_as_anchor.then(|| SurroundingWildcardHandler::new(pattern_separator));
     while let Some(Ok(token)) = lex.next() {
         if let Some(h) = &mut surrounding_handler {
-            if h.skip(token.to_wildcard(), &hirs, &lex) {
+            if h.skip(token, &mut hirs, &lex) {
                 continue;
             }
         }
@@ -497,7 +585,13 @@ pub fn parse_wildcard_path(
                 greedy: true,
                 sub: Hir::dot(Dot::AnyByte).into(),
             }),
-            WildcardPathToken::Text => Hir::literal(lex.slice().as_bytes()),
+            WildcardPathToken::SepUnix if pattern_separator.is_unix_or_any() => separator.literal(),
+            WildcardPathToken::SepWin if pattern_separator.is_windows_or_any() => {
+                separator.literal()
+            }
+            WildcardPathToken::Text | WildcardPathToken::SepUnix | WildcardPathToken::SepWin => {
+                Hir::literal(lex.slice().as_bytes())
+            }
         });
     }
 
@@ -527,25 +621,25 @@ pub enum GlobPathToken {
     #[token("**")]
     GlobStar,
 
-    /// Plain text.
-    #[regex(r"[^*?\[\]]+")]
-    Text,
-}
+    #[token("/")]
+    SepUnix,
 
-impl GlobPathToken {
-    fn to_wildcard(self) -> WildcardToken {
-        match self {
-            GlobPathToken::Any => WildcardToken::Any,
-            GlobPathToken::Star | GlobPathToken::GlobStar => WildcardToken::Star,
-            GlobPathToken::Text | GlobPathToken::Class => WildcardToken::Text,
-        }
-    }
+    #[token(r"\")]
+    SepWin,
+
+    /// Plain text.
+    #[regex(r"[^*?\[\]/\\]+")]
+    Text,
 }
 
 /// glob path syntax flavor, including `?`, `*`, `[]` and `**`.
 #[builder]
 pub fn parse_glob_path(
     #[builder(finish_fn)] pattern: &str,
+    /// The separator used in the pattern. Can be different from the one used in the haystacks to be matched.
+    ///
+    /// Defaults to the same as `separator`. You may want to use [`PathSeparator::Any`] instead.
+    pattern_separator: Option<PathSeparator>,
     /// The path separator used in the haystacks to be matched.
     ///
     /// Only have effect on `?` and `*`.
@@ -555,17 +649,19 @@ pub fn parse_glob_path(
     surrounding_wildcard_as_anchor: bool,
     #[builder(default)] ext: GlobExtConfig,
 ) -> Hir {
+    let pattern_separator = pattern_separator.unwrap_or(separator);
+
     // Desugar
     let pattern = ext.desugar(pattern, separator);
 
     let mut lex = GlobPathToken::lexer(&pattern);
     let mut hirs = Vec::new();
     let mut surrounding_handler =
-        surrounding_wildcard_as_anchor.then(SurroundingWildcardHandler::default);
+        surrounding_wildcard_as_anchor.then(|| SurroundingWildcardHandler::new(pattern_separator));
     let mut parser = ParserBuilder::new().unicode(false).utf8(false).build();
     while let Some(Ok(token)) = lex.next() {
         if let Some(h) = &mut surrounding_handler {
-            if h.skip(token.to_wildcard(), &hirs, &lex) {
+            if h.skip(token, &mut hirs, &lex) {
                 continue;
             }
         }
@@ -602,7 +698,11 @@ pub fn parse_glob_path(
                     }
                 }
             }
-            GlobPathToken::Text => Hir::literal(lex.slice().as_bytes()),
+            GlobPathToken::SepUnix if pattern_separator.is_unix_or_any() => separator.literal(),
+            GlobPathToken::SepWin if pattern_separator.is_windows_or_any() => separator.literal(),
+            GlobPathToken::Text | GlobPathToken::SepUnix | GlobPathToken::SepWin => {
+                Hir::literal(lex.slice().as_bytes())
+            }
         });
     }
 
@@ -615,7 +715,7 @@ pub fn parse_glob_path(
 
 #[cfg(test)]
 mod tests {
-    use regex_automata::Match;
+    use regex_automata::{nfa::thompson, Match};
     use regex_syntax::ParserBuilder;
 
     use crate::{matcher::MatchConfig, regex::lita::Regex};
@@ -858,5 +958,43 @@ mod tests {
             .unwrap();
         assert_eq!(re.find(r"瑠璃の宝石"), Some(Match::must(0, 0..15)));
         assert!(re.is_match(r"ruri 瑠璃の宝石") == false);
+    }
+
+    #[test]
+    fn surrounding_wildcard_as_anchor_path() {
+        // Leading ?
+        let re = Regex::builder()
+            .ib(MatchConfig::builder().pinyin(Default::default()).build())
+            .thompson(PathSeparator::Windows.look_matcher_config())
+            .build_from_hir(
+                parse_wildcard_path()
+                    .separator(PathSeparator::Windows)
+                    .call(r"?:\$RECYCLE*\"),
+            )
+            .unwrap();
+        assert!(re.is_match(r"C:\$RECYCLE.BIN\⑨"));
+        assert!(re.is_match(r"C:\$RECYCLE.BIN\9"));
+        assert!(re.is_match(r"C:\$RECYCLE.BIN\99"));
+        assert!(re.is_match(r"D:\C:\$RECYCLE.BIN\9"));
+        assert!(re.is_match(r"DC:\$RECYCLE.BIN\9") == false);
+        assert!(re.is_match(r"D:\DC:\$RECYCLE.BIN\9") == false);
+
+        // Trailing ?
+        let re = Regex::builder()
+            .ib(MatchConfig::builder().pinyin(Default::default()).build())
+            .thompson(PathSeparator::Windows.look_matcher_config())
+            .build_from_hir(
+                parse_wildcard_path()
+                    .separator(PathSeparator::Windows)
+                    .call(r"?:\$RECYCLE*\?"),
+            )
+            .unwrap();
+        assert!(re.is_match(r"C:\$RECYCLE.BIN\⑨"));
+        assert!(re.is_match(r"C:\$RECYCLE.BIN\9"));
+        assert!(re.is_match(r"C:\$RECYCLE.BIN\99") == false);
+        assert!(re.is_match(r"D:\C:\$RECYCLE.BIN\9"));
+        assert!(re.is_match(r"D:\C:\$RECYCLE.BIN\99") == false);
+        assert!(re.is_match(r"DC:\$RECYCLE.BIN\9") == false);
+        assert!(re.is_match(r"D:\DC:\$RECYCLE.BIN\9") == false);
     }
 }
