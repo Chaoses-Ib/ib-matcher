@@ -152,6 +152,7 @@ regex-automata = { version = "0.4", default-features = false, features = [
     # Bench
     "dfa",
     "hybrid",
+    "perf-literal",
 ] }
 ib-matcher = { features = [
     "pinyin",

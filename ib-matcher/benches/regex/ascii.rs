@@ -5,7 +5,12 @@ use ib_matcher::{
     matcher::{IbMatcher, MatchConfig, PinyinMatchConfig},
     regex::{cp, lita},
 };
-use regex_automata::util::syntax;
+use regex_automata::{
+    dfa::dense,
+    util::{prefilter::Prefilter, syntax},
+    MatchKind,
+};
+use regex_syntax::parse;
 
 pub fn criterion_benchmark(c: &mut Criterion) {
     let ascii_20 = "12345678901234567890pyEverythingss";
@@ -23,6 +28,33 @@ pub fn criterion_benchmark(c: &mut Criterion) {
             .unwrap();
         assert!(re.find(ascii_20).is_some());
         c.bench_function("re_dfa_dense", |b| b.iter(|| re.find(black_box(ascii_20))));
+
+        // TODO: Slower?
+        // memmem is not used? Or too short?
+        let re = regex_automata::dfa::regex::Regex::builder()
+            .syntax(syntax::Config::new().utf8(false))
+            .dense(
+                dense::Config::new().prefilter(Prefilter::new(MatchKind::LeftmostFirst, &["py"])),
+            )
+            .build(r"(?s-u)py[^\\]*ss")
+            .unwrap();
+        assert!(re.find(ascii_20).is_some());
+        c.bench_function("re_dfa_dense_prefilter", |b| {
+            b.iter(|| re.find(black_box(ascii_20)))
+        });
+
+        let re = regex_automata::dfa::regex::Regex::builder()
+            .syntax(syntax::Config::new().utf8(false))
+            .dense(dense::Config::new().prefilter(Prefilter::from_hir_prefix(
+                MatchKind::LeftmostFirst,
+                &parse(r"(?s-u)py").unwrap(),
+            )))
+            .build(r"(?s-u)py[^\\]*ss")
+            .unwrap();
+        assert!(re.find(ascii_20).is_some());
+        c.bench_function("re_dfa_dense_prefilter_parse", |b| {
+            b.iter(|| re.find(black_box(ascii_20)))
+        });
     }
 
     {
