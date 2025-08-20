@@ -1,8 +1,10 @@
-//! Unicode utils.
 /*!
+Fast Unicode utils.
+
 ## Features
-- Fast [`to_lowercase()`](case) (simple case folding)
-- Fast [ASCII](ascii) search utils
+- [Simple case folding](case#case-folding)
+- [Mono `to_lowercase()`](case#mono-lowercase)
+- [ASCII](ascii) search utils
 - `floor_char_boundary()` and `ceil_char_boundary()` polyfill
 
 ## Crate features
@@ -18,4 +20,5 @@ mod private {
 }
 use private::Sealed;
 
+impl Sealed for char {}
 impl Sealed for str {}

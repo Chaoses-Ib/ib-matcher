@@ -454,7 +454,7 @@ dependencies = [
 
 [[package]]
 name = "ib-unicode"
-version = "0.1.1"
+version = "0.2.0"
 dependencies = [
  "bstr",
  "criterion 0.7.0",

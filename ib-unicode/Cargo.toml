@@ -1,6 +1,6 @@
 [package]
 name = "ib-unicode"
-version = "0.1.1"
+version = "0.2.0"
 edition = "2021"
 description = "Unicode utils"
 keywords = ["unicode", "case", "ascii"]
@@ -9,17 +9,25 @@ authors.workspace = true
 license.workspace = true
 
 [features]
-default = []
+default = ["case-fold"]
+
+## Case folding support. See [`case`](case#case-folding) for details.
+case-fold = []
 
 ## Enables all performance related features. This feature is intended to cover all reasonable features that improve performance, even if more are added in the future.
-perf = ["perf-ascii", "perf-case-map"]
+perf = ["perf-ascii", "perf-case-fold", "perf-case-map"]
 ## ASCII-related optimizations.
 perf-ascii = ["dep:bstr", "perf-find"]
-## -37% match time, +38 KiB
+## [Case folding](case#case-folding) optimizations.
+perf-case-fold = []
+## [Mono lowercase](case#mono-lowercase) map. -37% match time, +38 KiB.
 perf-case-map = []
+## `find_*()` optimizations.
 perf-find = ["dep:memchr"]
+## Expose all underlying algorithms for benchmarking. No version compatibility guarantee.
+bench = ["perf-case-fold"]
 
-_test_regex = []
+_test_data = []
 doc = ["dep:document-features"]
 
 [dependencies]
@@ -29,10 +37,14 @@ memchr = { version = "2", optional = true }
 
 [dev-dependencies]
 criterion = "0.7"
-ib-unicode = { features = ["perf"], path = "." }
+ib-unicode = { features = ["perf", "bench"], path = "." }
 
 [[bench]]
 name = "ascii"
+harness = false
+
+[[bench]]
+name = "case"
 harness = false
 
 [package.metadata.docs.rs]

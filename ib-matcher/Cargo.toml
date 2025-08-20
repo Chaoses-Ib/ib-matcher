@@ -99,9 +99,9 @@ perf-literal = ["perf-literal-substring"]
 ## Enables all single substring literal optimizations. This includes adding a dependency on the `memchr` crate.
 perf-literal-substring = ["ib-unicode/perf-ascii"]
 ## Unicode and ASCII related optimizations.
-perf-unicode = ["ib-unicode/perf-ascii", "perf-unicode-case-map"]
-## -37% match time, +38 KiB
-perf-unicode-case-map = ["ib-unicode/perf-case-map"]
+perf-unicode = ["ib-unicode/perf-ascii", "ib-unicode/perf-case-fold"]
+# ## -37% match time, +38 KiB
+# perf-unicode-case-map = ["ib-unicode/perf-case-map"]
 
 perf-plain-ac = []
 ## Not used at the moment.
@@ -128,7 +128,7 @@ bitflags = { version = "2", optional = true }
 bon = "3"
 document-features = { version = "0.2", optional = true }
 ib-romaji = { version = "0.1.1", default-features = false, optional = true, path = "../ib-romaji" }
-ib-unicode = { version = "0.1.1", path = "../ib-unicode" }
+ib-unicode = { version = "0.2", path = "../ib-unicode" }
 itertools = "0.14"
 logos = { version = "0.15", default-features = false, features = [
     "export_derive",

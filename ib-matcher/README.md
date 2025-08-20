@@ -8,7 +8,7 @@ A multilingual, flexible and fast string and regex matcher, supports 拼音匹�
 ## Features
 - Unicode support
   - Fully UTF-8 support and limited support for UTF-16 and UTF-32.
-  - Unicode case insensitivity ([simple case folding](https://docs.rs/ib-unicode/latest/ib_unicode/case/#mono-lowercase), basically the same as `str::to_lowercase()` and the `regex` crate).
+  - Unicode case insensitivity ([simple case folding](https://docs.rs/ib-unicode/latest/ib_unicode/case/#case-folding)).
 - [Chinese pinyin](https://en.wikipedia.org/wiki/Pinyin) matching (拼音匹配)
   - Support characters with multiple readings (i.e. heteronyms, 多音字).
   - Support multiple pinyin notations, including [Quanpin (全拼)](https://zh.wikipedia.org/wiki/全拼), [Jianpin (简拼)](https://zh.wikipedia.org/wiki/简拼) and many [Shuangpin (双拼)](https://zh.wikipedia.org/wiki/%E5%8F%8C%E6%8B%BC) notations.
