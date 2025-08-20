@@ -4,3 +4,8 @@
 [![License](https://img.shields.io/crates/l/ib-unicode.svg)](../LICENSE.txt)
 
 Unicode utils.
+
+## Features
+- Fast `to_lowercase()` (simple case folding)
+- Fast ASCII search utils
+- `floor_char_boundary()` and `ceil_char_boundary()` polyfill

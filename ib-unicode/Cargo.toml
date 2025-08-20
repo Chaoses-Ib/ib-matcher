@@ -3,7 +3,7 @@ name = "ib-unicode"
 version = "0.1.1"
 edition = "2021"
 description = "Unicode utils"
-keywords = ["unicode", "case"]
+keywords = ["unicode", "case", "ascii"]
 repository = "https://github.com/Chaoses-Ib/ib-matcher/tree/master/ib-unicode"
 authors.workspace = true
 license.workspace = true
@@ -19,6 +19,7 @@ perf-ascii = ["dep:bstr", "perf-find"]
 perf-case-map = []
 perf-find = ["dep:memchr"]
 
+_test_regex = []
 doc = ["dep:document-features"]
 
 [dependencies]

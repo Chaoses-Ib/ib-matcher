@@ -377,11 +377,11 @@ pub fn to_mono_lowercase(c: char) -> char {
 }
 
 #[cfg(test)]
-mod tests {
+pub mod tests {
     use super::*;
 
     #[cfg_attr(rustfmt, rustfmt_skip)]
-    static LOWERCASE_TABLE: &[(char, u32)] = &[
+    pub static LOWERCASE_TABLE: &[(char, u32)] = &[
         ('\u{c0}', 224), ('\u{c1}', 225), ('\u{c2}', 226), ('\u{c3}', 227), ('\u{c4}', 228),
         ('\u{c5}', 229), ('\u{c6}', 230), ('\u{c7}', 231), ('\u{c8}', 232), ('\u{c9}', 233),
         ('\u{ca}', 234), ('\u{cb}', 235), ('\u{cc}', 236), ('\u{cd}', 237), ('\u{ce}', 238),
