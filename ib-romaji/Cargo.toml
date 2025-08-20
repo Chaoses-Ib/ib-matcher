@@ -20,7 +20,7 @@ doc = ["dep:document-features"]
 bon = "3"
 daachorse = "1"
 document-features = { version = "0.2", optional = true }
-ib-unicode = { version = "0.2", path = "../ib-unicode" }
+ib-unicode = { version = "0.2", default-features = false, path = "../ib-unicode" }
 include-bytes-zstd = { version = "0.1", optional = true }
 
 [[bench]]

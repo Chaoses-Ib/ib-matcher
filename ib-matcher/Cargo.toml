@@ -37,7 +37,7 @@ alloc = ["regex-automata?/alloc"]
 
 #! ### Languages
 ## Unicode support.
-unicode = ["regex-unicode"]
+unicode = ["ib-unicode/case-fold", "regex-unicode"]
 ## Chinese pinyin match support.
 pinyin = ["dep:arraystring", "dep:bitflags"]
 ## Japanese romaji match support.
@@ -128,7 +128,7 @@ bitflags = { version = "2", optional = true }
 bon = "3"
 document-features = { version = "0.2", optional = true }
 ib-romaji = { version = "0.1.1", default-features = false, optional = true, path = "../ib-romaji" }
-ib-unicode = { version = "0.2", path = "../ib-unicode" }
+ib-unicode = { version = "0.2", default-features = false, path = "../ib-unicode" }
 itertools = "0.14"
 logos = { version = "0.15", default-features = false, features = [
     "export_derive",

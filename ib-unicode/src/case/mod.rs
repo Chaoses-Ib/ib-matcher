@@ -55,6 +55,10 @@ pub trait CharCaseExt: Sealed {
     /// See [mono lowercase](super::case#mono-lowercase) for details.
     fn to_mono_lowercase(self) -> char;
 
+    /// A convenient method for feature-gated case folding.
+    /// If `case-fold` feature is enabled, it uses simple case folding; otherwise it uses `to_ascii_lowercase()`.
+    fn to_simple_or_ascii_fold_case(self) -> char;
+
     /// See [case folding](super::case#case-folding) for details.
     #[cfg(feature = "case-fold")]
     fn to_simple_fold_case(self) -> char;
@@ -77,6 +81,13 @@ impl CharCaseExt for char {
         // Reduce total match time by ~37%
         #[cfg(feature = "perf-case-map")]
         map::to_mono_lowercase(self)
+    }
+
+    fn to_simple_or_ascii_fold_case(self) -> char {
+        #[cfg(not(feature = "case-fold"))]
+        return self.to_ascii_lowercase();
+        #[cfg(feature = "case-fold")]
+        self.to_simple_fold_case()
     }
 
     #[cfg(feature = "case-fold")]
@@ -102,7 +113,12 @@ pub trait StrCaseExt: Sealed {
     /// See [mono lowercase](super::case#mono-lowercase) for details.
     fn to_mono_lowercase(&self) -> String;
 
+    /// A convenient method for feature-gated case folding.
+    /// If `case-fold` feature is enabled, it uses simple case folding; otherwise it uses `to_ascii_lowercase()`.
+    fn to_simple_or_ascii_fold_case(&self) -> String;
+
     /// See [case folding](super::case#case-folding) for details.
+    #[cfg(feature = "case-fold")]
     fn to_simple_fold_case(&self) -> String;
 }
 
@@ -111,6 +127,13 @@ impl StrCaseExt for str {
         self.chars().map(|c| c.to_mono_lowercase()).collect()
     }
 
+    fn to_simple_or_ascii_fold_case(&self) -> String {
+        self.chars()
+            .map(|c| c.to_simple_or_ascii_fold_case())
+            .collect()
+    }
+
+    #[cfg(feature = "case-fold")]
     fn to_simple_fold_case(&self) -> String {
         self.chars().map(|c| c.to_simple_fold_case()).collect()
     }

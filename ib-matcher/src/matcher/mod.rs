@@ -246,7 +246,7 @@ where
         let pattern_s: &str = pattern_string.as_str();
         let pattern_s: &'static str = unsafe { std::mem::transmute(pattern_s) };
 
-        let pattern_string_lowercase = pattern_string.to_simple_fold_case();
+        let pattern_string_lowercase = pattern_string.to_simple_or_ascii_fold_case();
         let pattern_s_lowercase: &str = pattern_string_lowercase.as_str();
         let pattern_s_lowercase: &'static str = unsafe { std::mem::transmute(pattern_s_lowercase) };
 
@@ -547,7 +547,7 @@ where
 
         if let Some(plain) = &self.plain {
             if match plain.case_insensitive {
-                true => haystack_c.to_simple_fold_case() == pattern_c.c_lowercase,
+                true => haystack_c.to_simple_or_ascii_fold_case() == pattern_c.c_lowercase,
                 false => haystack_c == pattern_c.c,
             } {
                 // If haystack_c == pattern_c, then it is impossible that pattern_c is a pinyin letter and haystack_c is a hanzi.
@@ -933,6 +933,7 @@ mod test {
         assert_match(matcher.test(u16str!("柯尔")), Some((0, 2)));
     }
 
+    #[cfg(feature = "unicode")]
     #[test]
     fn unicode_case() {
         let matcher = IbMatcher::builder("la vie est drôle").build();
