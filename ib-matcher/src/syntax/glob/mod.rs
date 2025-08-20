@@ -558,7 +558,7 @@ pub fn parse_wildcard_path(
     let pattern_separator = pattern_separator.unwrap_or(separator);
 
     // Desugar
-    let pattern = ext.desugar(pattern, separator);
+    let pattern = ext.desugar(pattern, pattern_separator);
 
     let mut lex = WildcardPathToken::lexer(&pattern);
     let mut hirs = Vec::new();
@@ -652,7 +652,7 @@ pub fn parse_glob_path(
     let pattern_separator = pattern_separator.unwrap_or(separator);
 
     // Desugar
-    let pattern = ext.desugar(pattern, separator);
+    let pattern = ext.desugar(pattern, pattern_separator);
 
     let mut lex = GlobPathToken::lexer(&pattern);
     let mut hirs = Vec::new();
@@ -715,7 +715,7 @@ pub fn parse_glob_path(
 
 #[cfg(test)]
 mod tests {
-    use regex_automata::{nfa::thompson, Match};
+    use regex_automata::Match;
     use regex_syntax::ParserBuilder;
 
     use crate::{matcher::MatchConfig, regex::lita::Regex};
