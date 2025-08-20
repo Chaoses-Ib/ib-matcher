@@ -305,6 +305,4 @@ These classes are based on the definitions provided in
 */
 pub use regex_syntax::*;
 
-pub mod case;
-pub mod fold;
 pub mod hir;

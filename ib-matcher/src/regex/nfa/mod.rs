@@ -510,10 +510,11 @@ impl NFA {
 #[cfg(test)]
 mod tests {
     use regex_automata::Match;
+    use regex_syntax::ParserBuilder;
 
     use crate::{
         matcher::PinyinMatchConfig, pinyin::PinyinNotation,
-        regex::nfa::backtrack::BoundedBacktracker, syntax::regex as syntax,
+        regex::nfa::backtrack::BoundedBacktracker, syntax::regex::hir,
     };
 
     use super::*;
@@ -544,7 +545,7 @@ mod tests {
     #[test]
     fn patch_bytes() {
         let (hir, literals) =
-            syntax::fold::parse_and_fold_literal_utf8("pyss").unwrap();
+            hir::fold::parse_and_fold_literal_utf8("pyss").unwrap();
         let mut nfa: NFA =
             thompson::Compiler::new().build_from_hir(&hir).unwrap().into();
         nfa.patch_bytes_to_matchers(
@@ -570,12 +571,11 @@ mod tests {
 
     #[test]
     fn patch_bytes_conflict_gt() {
-        let mut parser =
-            syntax::ParserBuilder::new().case_insensitive(true).build();
+        let mut parser = ParserBuilder::new().case_insensitive(true).build();
         let hir = parser.parse("δ").unwrap();
 
         let (mut hirs, literals) =
-            syntax::fold::fold_literal_utf8(std::iter::once(hir));
+            hir::fold::fold_literal_utf8(std::iter::once(hir));
         let hir = hirs.pop().unwrap();
 
         let mut nfa: NFA =
@@ -607,7 +607,7 @@ mod tests {
     #[should_panic(expected = "Too many bytes")]
     #[test]
     fn patch_bytes_conflict_lt() {
-        let (hir, literals) = syntax::fold::parse_and_fold_literal_utf8(
+        let (hir, literals) = hir::fold::parse_and_fold_literal_utf8(
             // r"a([\x00-\x00\u0100\u0200])",
             &format!(r"{}[\u0100\u0200]", "(a)".repeat(129)),
         )
@@ -643,7 +643,7 @@ mod tests {
     #[test]
     fn patch_bytes_alt() {
         let (hir, literals) =
-            syntax::fold::parse_and_fold_literal_utf8("samwise|sam").unwrap();
+            hir::fold::parse_and_fold_literal_utf8("samwise|sam").unwrap();
         dbg!(&hir, &literals);
 
         let mut nfa: NFA =

@@ -18,7 +18,7 @@ use crate::{
         util::{self, captures::Captures},
         Input, Match, MatchError,
     },
-    syntax::regex as syntax,
+    syntax::regex::hir,
 };
 
 pub use crate::regex::nfa::{backtrack::Config, thompson::BuildError};
@@ -322,10 +322,9 @@ impl<'a> Regex<'a> {
                             !(hir_case_insensitive && !plain.case_insensitive)
                         );
                         if !hir_case_insensitive && plain.case_insensitive {
-                            hir_buf =
-                                syntax::case::hir_to_ascii_case_insensitive(
-                                    hir.clone(),
-                                );
+                            hir_buf = hir::case::hir_to_ascii_case_insensitive(
+                                hir.clone(),
+                            );
                             hir = &hir_buf;
                         }
                     }

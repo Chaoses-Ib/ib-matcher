@@ -23,7 +23,7 @@ use crate::{
         util::{self, captures::Captures, pool::Pool, prefilter::PrefilterIb},
         Input, Match, MatchError,
     },
-    syntax::regex::{self as syntax, hir::literal::extract_first_byte},
+    syntax::regex::hir,
 };
 
 pub use crate::regex::nfa::{
@@ -430,11 +430,11 @@ impl<'a> Regex<'a> {
         let case_insensitive =
             imp.config.plain.as_ref().is_some_and(|p| p.case_insensitive);
         #[cfg(feature = "perf-literal-substring")]
-        let mut first_byte = extract_first_byte(&hirs);
+        #[allow(unused_mut)]
+        let mut first_byte = hir::literal::extract_first_byte(&hirs);
 
         // Copy-and-patch NFA
-        let (hirs, literals) =
-            syntax::fold::fold_literal_utf8(hirs.into_iter());
+        let (hirs, literals) = hir::fold::fold_literal_utf8(hirs.into_iter());
         let mut nfa: NFA = thompson::Compiler::new()
             .configure(configure)
             .build_many_from_hir(&hirs)?
