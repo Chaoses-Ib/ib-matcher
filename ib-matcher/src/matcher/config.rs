@@ -1,3 +1,4 @@
+#![cfg_attr(not(feature = "regex"), allow(unused))]
 use std::{
     marker::PhantomPinned,
     mem::{transmute, MaybeUninit},

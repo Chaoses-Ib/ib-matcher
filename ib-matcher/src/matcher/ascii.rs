@@ -5,10 +5,10 @@ use bon::{bon, Builder};
 
 use crate::matcher::Match;
 
-/// Note [`PlainMatchConfigBuilder::case_insensitive`] is `true` by default, unlike [`PinyinMatchConfigBuilder`] and [`RomajiMatchConfigBuilder`].
+/// Note [`PlainMatchConfigBuilder::case_insensitive`] is `true` by default, unlike [`PinyinMatchConfigBuilder`](super::PinyinMatchConfigBuilder) and [`RomajiMatchConfigBuilder`](super::RomajiMatchConfigBuilder).
 #[derive(Builder, Clone, Debug)]
 pub struct PlainMatchConfig {
-    /// The case insensitivity of pinyin is controlled by [`PinyinMatchConfigBuilder::case_insensitive`].
+    /// The case insensitivity of pinyin is controlled by [`PinyinMatchConfigBuilder::case_insensitive`](super::PinyinMatchConfigBuilder::case_insensitive).
     #[builder(default = true)]
     pub(crate) case_insensitive: bool,
 

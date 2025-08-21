@@ -114,7 +114,7 @@ assert_eq!(re.find("葬送のフリーレン"), Some(Match::must(0, 0..24)));
 ///     .unwrap();
 /// assert!(re.is_match("PY搜索"));
 /// ```
-/// Note that enabling `syntax.case_insensitive` will make `ib` (i.e. pinyin and romaji match) doesn't work at the moment. You should only set [`MatchConfigBuilder::case_insensitive`](crate::matcher::MatchConfigBuilder::case_insensitive) ([`PlainMatchConfig::case_insensitive`](crate::matcher::PlainMatchConfig::case_insensitive)).
+/// Note that enabling `syntax.case_insensitive` will make `ib` (i.e. pinyin and romaji match) doesn't work at the moment. You should only set [`MatchConfigBuilder::case_insensitive`](crate::matcher::MatchConfigBuilder::case_insensitive) ([`PlainMatchConfigBuilder::case_insensitive`](crate::matcher::PlainMatchConfigBuilder::case_insensitive)).
 ///
 /// If you need case insensitive character classes, you need to write `(?i:[a-z])` instead at the moment.
 ///

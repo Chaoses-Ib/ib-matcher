@@ -1,3 +1,35 @@
+/*!
+The Ib matcher. See [`IbMatcher`].
+
+## Example
+```
+// cargo add ib-matcher --features pinyin,romaji
+use ib_matcher::{
+    matcher::{IbMatcher, PinyinMatchConfig, RomajiMatchConfig},
+    pinyin::PinyinNotation,
+};
+
+let matcher = IbMatcher::builder("la vie est drôle").build();
+assert!(matcher.is_match("LA VIE EST DRÔLE"));
+
+let matcher = IbMatcher::builder("βίος").build();
+assert!(matcher.is_match("Βίοσ"));
+assert!(matcher.is_match("ΒΊΟΣ"));
+
+let matcher = IbMatcher::builder("pysousuoeve")
+    .pinyin(PinyinMatchConfig::notations(
+        PinyinNotation::Ascii | PinyinNotation::AsciiFirstLetter,
+    ))
+    .build();
+assert!(matcher.is_match("拼音搜索Everything"));
+
+let matcher = IbMatcher::builder("konosuba")
+    .romaji(RomajiMatchConfig::default())
+    .is_pattern_partial(true)
+    .build();
+assert!(matcher.is_match("この素晴らしい世界に祝福を"));
+```
+*/
 use std::{fmt::Debug, marker::PhantomData};
 
 use bon::{bon, Builder};
@@ -107,6 +139,36 @@ struct PatternChar<'a> {
     s_lowercase: &'a str,
 }
 
+/**
+## Example
+```
+// cargo add ib-matcher --features pinyin,romaji
+use ib_matcher::{
+    matcher::{IbMatcher, PinyinMatchConfig, RomajiMatchConfig},
+    pinyin::PinyinNotation,
+};
+
+let matcher = IbMatcher::builder("la vie est drôle").build();
+assert!(matcher.is_match("LA VIE EST DRÔLE"));
+
+let matcher = IbMatcher::builder("βίος").build();
+assert!(matcher.is_match("Βίοσ"));
+assert!(matcher.is_match("ΒΊΟΣ"));
+
+let matcher = IbMatcher::builder("pysousuoeve")
+    .pinyin(PinyinMatchConfig::notations(
+        PinyinNotation::Ascii | PinyinNotation::AsciiFirstLetter,
+    ))
+    .build();
+assert!(matcher.is_match("拼音搜索Everything"));
+
+let matcher = IbMatcher::builder("konosuba")
+    .romaji(RomajiMatchConfig::default())
+    .is_pattern_partial(true)
+    .build();
+assert!(matcher.is_match("この素晴らしい世界に祝福を"));
+```
+*/
 /// ## Design
 /// API follows [`regex::Regex`](https://docs.rs/regex/latest/regex/struct.Regex.html).
 ///

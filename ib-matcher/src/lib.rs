@@ -1,5 +1,5 @@
 /*!
-A multilingual, flexible and fast string and regex matcher, supports 拼音匹配 (Chinese pinyin match) and ローマ字検索 (Japanese romaji match).
+A multilingual, flexible and fast string, glob and regex matcher. Support 拼音匹配 (Chinese pinyin match) and ローマ字検索 (Japanese romaji match).
 
 ## Features
 - Unicode support
@@ -21,37 +21,60 @@ A multilingual, flexible and fast string and regex matcher, supports 拼音匹�
   - Support the same syntax as [`regex`](https://docs.rs/regex/), including wildcards, repetitions, alternations, groups, etc.
   - Support [custom matching callbacks](regex::cp::Regex#custom-matching-callbacks), which can be used to implement ad hoc look-around, backreferences, balancing groups/recursion/subroutines, combining domain-specific parsers, etc.
 - Relatively high performance
+  - Generally on par with the `regex` crate, depending on the case it can be faster or slower.
 
 And all of the above features are optional. You don't need to pay the performance and binary size cost for features you don't use.
 
 You can also use [ib-pinyin](https://docs.rs/ib-pinyin/) if you only need Chinese pinyin match, which is simpler and more stable.
-*/
-//! ## Usage
-//! ```
-//! //! cargo add ib-matcher --features pinyin,romaji
-//! use ib_matcher::{
-//!     matcher::{IbMatcher, PinyinMatchConfig, RomajiMatchConfig},
-//!     pinyin::PinyinNotation,
-//! };
-//!
-//! let matcher = IbMatcher::builder("pysousuoeve")
-//!     .pinyin(PinyinMatchConfig::notations(
-//!         PinyinNotation::Ascii | PinyinNotation::AsciiFirstLetter,
-//!     ))
-//!     .build();
-//! assert!(matcher.is_match("拼音搜索Everything"));
-//!
-//! let matcher = IbMatcher::builder("konosuba")
-//!     .romaji(RomajiMatchConfig::default())
-//!     .is_pattern_partial(true)
-//!     .build();
-//! assert!(matcher.is_match("この素晴らしい世界に祝福を"));
-//! ```
-/*!
+
+## Usage
+```
+// cargo add ib-matcher --features pinyin,romaji
+use ib_matcher::matcher::{IbMatcher, PinyinMatchConfig, RomajiMatchConfig};
+
+let matcher = IbMatcher::builder("la vie est drôle").build();
+assert!(matcher.is_match("LA VIE EST DRÔLE"));
+
+let matcher = IbMatcher::builder("βίος").build();
+assert!(matcher.is_match("Βίοσ"));
+assert!(matcher.is_match("ΒΊΟΣ"));
+
+let matcher = IbMatcher::builder("pysousuoeve")
+    .pinyin(PinyinMatchConfig::default())
+    .build();
+assert!(matcher.is_match("拼音搜索Everything"));
+
+let matcher = IbMatcher::builder("konosuba")
+    .romaji(RomajiMatchConfig::default())
+    .is_pattern_partial(true)
+    .build();
+assert!(matcher.is_match("この素晴らしい世界に祝福を"));
+```
 See also [choosing a matcher](#choosing-a-matcher).
 
+## glob()-style pattern matching
+See [`glob` module](syntax::glob) for more details. Here is a quick example:
+```
+// cargo add ib-matcher --features syntax-glob,regex,romaji
+use ib_matcher::{
+    matcher::MatchConfig,
+    regex::lita::Regex,
+    syntax::glob::{parse_wildcard_path, PathSeparator}
+};
+
+let re = Regex::builder()
+    .ib(MatchConfig::builder().romaji(Default::default()).build())
+    .build_from_hir(
+        parse_wildcard_path()
+            .separator(PathSeparator::Windows)
+            .call("wifi**miku"),
+    )
+    .unwrap();
+assert!(re.is_match(r"C:\Windows\System32\ja-jp\WiFiTask\ミク.exe"));
+```
+
 ## Regular expression
-See [`regex`] module for more details. For example:
+See [`regex`] module for more details. Here is a quick example:
 ```
 // cargo add ib-matcher --features regex,pinyin,romaji
 use ib_matcher::{

@@ -1,5 +1,5 @@
 /*!
-glob()-style pattern matching syntax support.
+[glob()-style](https://en.wikipedia.org/wiki/Glob_(programming)) (wildcard) pattern matching syntax support.
 
 Supported syntax:
 - [`parse_wildcard_path`]: `?`, `*` and `**`, optionally with [`GlobExtConfig`].
@@ -786,6 +786,16 @@ mod tests {
             )
             .unwrap();
         assert!(re.is_match(r"C:\Windows\System32\拼音搜索.exe"));
+
+        let re = Regex::builder()
+            .ib(MatchConfig::builder().romaji(Default::default()).build())
+            .build_from_hir(
+                parse_wildcard_path()
+                    .separator(PathSeparator::Windows)
+                    .call("wifi**miku"),
+            )
+            .unwrap();
+        assert!(re.is_match(r"C:\Windows\System32\ja-jp\WiFiTask\ミク.exe"));
     }
 
     #[test]

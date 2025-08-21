@@ -3,7 +3,7 @@
 [![Documentation](https://docs.rs/ib-matcher/badge.svg)](https://docs.rs/ib-matcher)
 [![License](https://img.shields.io/crates/l/ib-matcher.svg)](LICENSE.txt)
 
-A multilingual, flexible and fast string and regex matcher, supports 拼音匹配 (Chinese pinyin match) and ローマ字検索 (Japanese romaji match).
+A multilingual, flexible and fast string, glob and regex matcher. Support 拼音匹配 (Chinese pinyin match) and ローマ字検索 (Japanese romaji match).
 
 ## Features
 - Unicode support
@@ -23,23 +23,28 @@ A multilingual, flexible and fast string and regex matcher, supports 拼音匹�
   - Support the same syntax as [`regex`](https://docs.rs/regex/), including wildcards, repetitions, alternations, groups, etc.
   - Support [custom matching callbacks](https://docs.rs/ib-matcher/latest/ib_matcher/regex/cp/struct.Regex.html#custom-matching-callbacks), which can be used to implement ad hoc look-around, backreferences, balancing groups/recursion/subroutines, combining domain-specific parsers, etc.
 - Relatively high performance
+  - Generally on par with the `regex` crate, depending on the case it can be faster or slower.
 
 And all of the above features are optional. You don't need to pay the performance and binary size cost for features you don't use.
+
+See [documentation](https://docs.rs/ib-matcher) for details.
 
 You can also use [ib-pinyin](#ib-pinyin) if you only need Chinese pinyin match, which is simpler and more stable.
 
 ## Usage
 ```rust
-//! cargo add ib-matcher --features pinyin,romaji
-use ib_matcher::{
-    matcher::{IbMatcher, PinyinMatchConfig, RomajiMatchConfig},
-    pinyin::PinyinNotation,
-};
+// cargo add ib-matcher --features pinyin,romaji
+use ib_matcher::matcher::{IbMatcher, PinyinMatchConfig, RomajiMatchConfig};
+
+let matcher = IbMatcher::builder("la vie est drôle").build();
+assert!(matcher.is_match("LA VIE EST DRÔLE"));
+
+let matcher = IbMatcher::builder("βίος").build();
+assert!(matcher.is_match("Βίοσ"));
+assert!(matcher.is_match("ΒΊΟΣ"));
 
 let matcher = IbMatcher::builder("pysousuoeve")
-    .pinyin(PinyinMatchConfig::notations(
-        PinyinNotation::Ascii | PinyinNotation::AsciiFirstLetter,
-    ))
+    .pinyin(PinyinMatchConfig::default())
     .build();
 assert!(matcher.is_match("拼音搜索Everything"));
 
@@ -50,8 +55,29 @@ let matcher = IbMatcher::builder("konosuba")
 assert!(matcher.is_match("この素晴らしい世界に祝福を"));
 ```
 
+## glob()-style pattern matching
+See [`glob` module](https://docs.rs/ib-matcher/latest/ib_matcher/syntax/glob/) for more details. Here is a quick example:
+```rust
+// cargo add ib-matcher --features syntax-glob,regex,romaji
+use ib_matcher::{
+    matcher::MatchConfig,
+    regex::lita::Regex,
+    syntax::glob::{parse_wildcard_path, PathSeparator}
+};
+
+let re = Regex::builder()
+    .ib(MatchConfig::builder().romaji(Default::default()).build())
+    .build_from_hir(
+        parse_wildcard_path()
+            .separator(PathSeparator::Windows)
+            .call("wifi**miku"),
+    )
+    .unwrap();
+assert!(re.is_match(r"C:\Windows\System32\ja-jp\WiFiTask\ミク.exe"));
+```
+
 ## Regular expression
-See [`regex` module](https://docs.rs/ib-matcher/latest/ib_matcher/regex/) for more details. For example:
+See [`regex` module](https://docs.rs/ib-matcher/latest/ib_matcher/regex/) for more details. Here is a quick example:
 ```rust
 // cargo add ib-matcher --features regex,pinyin,romaji
 use ib_matcher::{
@@ -219,7 +245,7 @@ Perl <br /> ([Rust](https://github.com/chowdhurya/rust-unidecode/), [Java](https
 - [Simple tokenizer: 支持中文和拼音的 SQLite fts5 全文搜索扩展 ｜ A SQLite3 fts5 tokenizer which supports Chinese and PinYin](https://github.com/wangfenjin/simple)
 
 文件搜索/启动器：
-- [IbEverythingExt: Everything Everything 拼音搜索、ローマ字検索、快速选择扩展](https://github.com/Chaoses-Ib/IbEverythingExt)（基于 ib-matcher）
+- [IbEverythingExt: Everything 拼音搜索、ローマ字検索、通配符、快速选择扩展](https://github.com/Chaoses-Ib/IbEverythingExt)（基于 ib-matcher）
 - [Listary](https://www.listary.com/)（简拼、全拼）
 
 文件管理：

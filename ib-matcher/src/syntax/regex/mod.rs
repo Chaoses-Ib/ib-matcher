@@ -119,7 +119,7 @@ $               the end of a haystack (or end-of-line with multi-line mode)
 
 The empty regex is valid and matches the empty string. For example, the
 empty regex matches `abc` at positions `0`, `1`, `2` and `3`. When using the
-top-level [`cp::Regex`] on `&str` haystacks, an empty match that splits a codepoint
+top-level [`cp::Regex`](crate::regex::cp::Regex) on `&str` haystacks, an empty match that splits a codepoint
 is guaranteed to never be returned. For example:
 
 ```rust
