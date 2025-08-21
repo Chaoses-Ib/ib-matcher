@@ -167,7 +167,7 @@ mod tests {
 }
 
 /// ucd-generate case-folding-simple ucd-16.0.0 --chars --all-pairs > case-folding-simple-chars-all-pairs.rs
-#[cfg(feature = "_test_data")]
+#[cfg(all(not(feature = "doc"), feature = "_test_data"))]
 mod tests_data {
     use std::collections::HashSet;
 

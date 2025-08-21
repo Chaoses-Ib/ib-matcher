@@ -3,7 +3,7 @@ pub fn fold(c: char) -> char {
 }
 
 /// ucd-generate case-folding-simple ucd-16.0.0 --chars > case-folding-simple-chars.rs
-#[cfg(feature = "_test_data")]
+#[cfg(all(not(feature = "doc"), feature = "_test_data"))]
 mod codegen {
     use std::{fmt::Write, fs};
 

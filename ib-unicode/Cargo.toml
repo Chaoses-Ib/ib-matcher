@@ -1,6 +1,6 @@
 [package]
 name = "ib-unicode"
-version = "0.2.0"
+version = "0.2.1"
 edition = "2021"
 description = "Unicode utils"
 keywords = ["unicode", "case", "ascii"]
