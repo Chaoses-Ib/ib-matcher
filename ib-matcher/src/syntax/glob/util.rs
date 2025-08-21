@@ -1,6 +1,6 @@
 use regex_syntax::hir::{Hir, Look};
 
-use crate::syntax::glob::{GlobPathToken, PathSeparator, WildcardPathToken};
+use crate::syntax::glob::{GlobPathToken, PathSeparator, WildcardPathToken, WildcardToken};
 
 pub(crate) enum SurroundingHandleToken {
     Any,
@@ -8,6 +8,16 @@ pub(crate) enum SurroundingHandleToken {
     SepUnix,
     SepWin,
     Unwild,
+}
+
+impl From<WildcardToken> for SurroundingHandleToken {
+    fn from(token: WildcardToken) -> Self {
+        match token {
+            WildcardToken::Any => Self::Any,
+            WildcardToken::Star => Self::Star,
+            WildcardToken::Text => Self::Unwild,
+        }
+    }
 }
 
 impl From<WildcardPathToken> for SurroundingHandleToken {
@@ -44,6 +54,7 @@ pub struct SurroundingWildcardHandler {
 }
 
 impl SurroundingWildcardHandler {
+    /// - `pattern_separator`: No effect if no `Sep` token
     pub fn new(pattern_separator: PathSeparator) -> Self {
         Self {
             leading_wildcard: false,

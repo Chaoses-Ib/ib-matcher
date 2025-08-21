@@ -2,6 +2,9 @@
 [glob()-style](https://en.wikipedia.org/wiki/Glob_(programming)) (wildcard) pattern matching syntax support.
 
 Supported syntax:
+- [`parse_wildcard`]: `?` and `*`.
+  - Windows file name safe.
+
 - [`parse_wildcard_path`]: `?`, `*` and `**`, optionally with [`GlobExtConfig`].
   - Windows file name safe.
 
@@ -203,6 +206,7 @@ use util::SurroundingWildcardHandler;
 
 mod util;
 
+/// See [`parse_wildcard`].
 #[derive(Logos, Clone, Copy, Debug, PartialEq)]
 pub enum WildcardToken {
     /// Equivalent to `.`.
@@ -216,6 +220,44 @@ pub enum WildcardToken {
     /// Plain text.
     #[regex("[^*?]+")]
     Text,
+}
+
+/// Wildcard-only glob syntax flavor, including `?` and `*`.
+#[builder]
+pub fn parse_wildcard(
+    #[builder(finish_fn)] pattern: &str,
+    /// See [`surrounding wildcards as anchors`](super::glob#surrounding-wildcards-as-anchors).
+    #[builder(default = true)]
+    surrounding_wildcard_as_anchor: bool,
+) -> Hir {
+    let mut lex = WildcardToken::lexer(&pattern);
+    let mut hirs = Vec::new();
+    let mut surrounding_handler =
+        surrounding_wildcard_as_anchor.then(|| SurroundingWildcardHandler::new(PathSeparator::Any));
+    while let Some(Ok(token)) = lex.next() {
+        if let Some(h) = &mut surrounding_handler {
+            if h.skip(token, &mut hirs, &lex) {
+                continue;
+            }
+        }
+
+        hirs.push(match token {
+            WildcardToken::Any => Hir::dot(Dot::AnyChar),
+            WildcardToken::Star => Hir::repetition(Repetition {
+                min: 0,
+                max: None,
+                greedy: true,
+                sub: Hir::dot(Dot::AnyByte).into(),
+            }),
+            WildcardToken::Text => Hir::literal(lex.slice().as_bytes()),
+        });
+    }
+
+    if let Some(h) = surrounding_handler {
+        h.insert_anchors(&mut hirs);
+    }
+
+    Hir::concat(hirs)
 }
 
 /// Defaults to [`PathSeparator::Os`], i.e. `/` on Unix and `\` on Windows.
@@ -736,6 +778,21 @@ mod tests {
         assert_eq!(lexer.next(), Some(Ok(WildcardPathToken::GlobStar)));
         assert_eq!(lexer.next(), Some(Ok(WildcardPathToken::Text)));
         assert_eq!(lexer.next(), None);
+    }
+
+    #[test]
+    fn wildcard() {
+        let re = Regex::builder()
+            .build_from_hir(parse_wildcard().call("?a*b**c"))
+            .unwrap();
+        assert!(re.is_match(r"1a2b33c"));
+        assert!(re.is_match(r"1a\b33c"));
+        assert!(re.is_match(r"b1a\b33c") == false);
+
+        let re = Regex::builder()
+            .build_from_hir(parse_wildcard().call(r"Win*\*\*.exe"))
+            .unwrap();
+        assert!(re.is_match(r"C:\Windows\System32\notepad.exe"));
     }
 
     #[test]
