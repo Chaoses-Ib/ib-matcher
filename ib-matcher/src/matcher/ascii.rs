@@ -260,6 +260,16 @@ impl<const CHAR_LEN: usize> AsciiMatcher<CHAR_LEN> {
         b == self.first_byte.0 || b == self.first_byte.1
     }
 
+    #[inline(always)]
+    pub fn find_first_or_non_ascii_byte(&self, haystack: &[u8]) -> Option<usize> {
+        ib_unicode::ascii::find_byte2_or_non_ascii_byte(
+            haystack,
+            self.first_byte.0,
+            self.first_byte.1,
+        )
+        .map(|i| i / CHAR_LEN)
+    }
+
     /// ~15% faster than [`AsciiMatcher::AcDFA`]
     #[inline(always)]
     fn test_single(

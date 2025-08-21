@@ -446,19 +446,58 @@ where
         }
 
         // TODO: ends_with optimization
-        for (i, _c, str) in haystack.char_index_strs() {
-            if self.is_haystack_too_short(str) {
-                break;
-            }
-            if let Some(submatch) = self.sub_test::<0xFF>(&self.pattern, str, 0) {
-                return Some(Match {
-                    start: i,
-                    end: i + submatch.len,
-                    is_pattern_partial: submatch.is_pattern_partial,
-                });
+        if HaystackStr::UTF8 {
+            if self.is_haystack_too_short(haystack) {
+                return None;
             }
             if self.starts_with {
-                break;
+                return self
+                    .sub_test::<0xFF>(&self.pattern, haystack, 0)
+                    .map(|submatch| Match {
+                        start: 0,
+                        end: submatch.len,
+                        is_pattern_partial: submatch.is_pattern_partial,
+                    });
+            }
+
+            // ASCII prefilter, -30% for matcher find_ascii_25
+            let mut i = 0;
+            while let Some(m) = self
+                .ascii
+                .find_first_or_non_ascii_byte(&haystack.as_bytes()[i..])
+            {
+                i += m;
+
+                let str = unsafe { haystack.get_unchecked_from(i..) };
+                if self.is_haystack_too_short(str) {
+                    break;
+                }
+                if let Some(submatch) = self.sub_test::<0xFF>(&self.pattern, str, 0) {
+                    return Some(Match {
+                        start: i,
+                        end: i + submatch.len,
+                        is_pattern_partial: submatch.is_pattern_partial,
+                    });
+                }
+
+                let s = unsafe { str::from_utf8_unchecked(&haystack.as_bytes()[i..]) };
+                i += unsafe { s.chars().next().unwrap_unchecked() }.len_utf8();
+            }
+        } else {
+            for (i, _c, str) in haystack.char_index_strs() {
+                if self.is_haystack_too_short(str) {
+                    break;
+                }
+                if let Some(submatch) = self.sub_test::<0xFF>(&self.pattern, str, 0) {
+                    return Some(Match {
+                        start: i,
+                        end: i + submatch.len,
+                        is_pattern_partial: submatch.is_pattern_partial,
+                    });
+                }
+                if self.starts_with {
+                    break;
+                }
             }
         }
 
@@ -538,9 +577,16 @@ where
         }
 
         // ASCII prefilter, -17% for regex_lita find_re
-        let b = haystack.as_bytes()[0];
-        if b.is_ascii() && !self.ascii.test_first_byte(b) {
-            return None;
+        if HaystackStr::UTF8 {
+            let b = haystack.as_bytes()[0];
+            if b.is_ascii() && !self.ascii.test_first_byte(b) {
+                return None;
+            }
+        } else {
+            // For UTF-16 LE and UTF-32 LE:
+            // - If the first char is ASCII, the first byte is ASCII and `test_first_byte()` is correct.
+            // - If the first char is not ASCII, the first byte may be ASCII or not, `test_first_byte()` is useless.
+            // TODO: Test the first char is ASCII or not
         }
 
         if (!CONF_MAYBE_ASCII

@@ -11,6 +11,7 @@ pub trait EncodedStr: Sealed {
 
     const ELEMENT_LEN_BYTE: usize = core::mem::size_of::<Self::CHAR>();
     const CHAR: usize = Self::ELEMENT_LEN_BYTE;
+    const UTF8: bool = false;
 
     fn is_ascii(&self) -> bool;
     fn as_bytes(&self) -> &[u8];
@@ -40,6 +41,8 @@ impl Sealed for widestring::U32Str {}
 impl EncodedStr for str {
     type CHAR = u8;
     type SLICE = str;
+
+    const UTF8: bool = true;
 
     fn is_ascii(&self) -> bool {
         self.is_ascii()
