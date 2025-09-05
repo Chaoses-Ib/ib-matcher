@@ -1,5 +1,25 @@
 # ib-pinyin-ahk2
-Binding for [AutoHotkey](https://www.autohotkey.com/) v2.
+`ib-pinyin` binding for [AutoHotkey](https://www.autohotkey.com/) v2.
+
+一个高性能拼音匹配库。
+
+- 支持以下拼音编码方案：
+  - 简拼（“py”）
+  - 全拼（“pinyin”）
+  - 带声调全拼（“pin1yin1”）
+  - Unicode（“pīnyīn”）
+  - 智能 ABC 双拼
+  - 拼音加加双拼
+  - 微软双拼
+  - 华宇双拼（紫光双拼）
+  - 小鹤双拼
+  - 自然码双拼
+- 支持多音字。
+- 支持混合匹配多种拼音编码方案，默认匹配简拼和全拼。
+- 默认小写字母匹配拼音或字母，大写字母只匹配字母。
+- 支持 Unicode 辅助平面汉字。
+
+[下载](https://github.com/Chaoses-Ib/ib-matcher/releases)
 
 ## Usage
 [example.ahk](example.ahk):

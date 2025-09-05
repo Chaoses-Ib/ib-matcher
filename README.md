@@ -31,6 +31,14 @@ See [documentation](https://docs.rs/ib-matcher) for details.
 
 You can also use [ib-pinyin](#ib-pinyin) if you only need Chinese pinyin match, which is simpler and more stable.
 
+Bindings for other languages:
+- C/C++
+  - [ib-pinyin-c](ib-pinyin/bindings/c/README.md) (Chinese pinyin matching)
+  - [ib-bridge](https://github.com/baka-gourd/ib-matcher/tree/master/ib-bridge/rust) (Chinese pinyin and Japanese romaji matching)
+  - [ib-pinyin-cpp](ib-pinyin-cpp/README.md) (port, Chinese pinyin querying, discontinued)
+- .NET: [IbMatcher.Net](https://github.com/baka-gourd/IbMatcher.Net) / [IbBridge](https://github.com/baka-gourd/ib-matcher/tree/master/ib-bridge) (Chinese pinyin and Japanese romaji matching)
+- AutoHotkey v2: [ib-pinyin-ahk2](ib-pinyin/bindings/ahk2/README.md) (Chinese pinyin matching)
+
 ## Usage
 ```rust
 // cargo add ib-matcher --features pinyin,romaji
@@ -153,7 +161,7 @@ assert_eq!(&hay[re.find(hay).unwrap().span()], " this4me");
 
 支持 C、AHK2。
 
-### [Rust](ib-pinyin)
+### [Rust](ib-pinyin/README.md)
 [![crates.io](https://img.shields.io/crates/v/ib-pinyin.svg)](https://crates.io/crates/ib-pinyin)
 [![Documentation](https://docs.rs/ib-pinyin/badge.svg)](https://docs.rs/ib-pinyin)
 
@@ -166,7 +174,7 @@ let matcher = PinyinMatcher::builder("pysousuoeve")
 assert!(matcher.is_match("拼音搜索Everything"));
 ```
 
-### [C](ib-pinyin/bindings/c)
+### [C](ib-pinyin/bindings/c/README.md)
 ```c
 #include <ib_pinyin/ib_pinyin.h>
 #include <ib_pinyin/notation.h>
@@ -182,9 +190,9 @@ bool is_match = ib_pinyin_is_match_u32c(U"pysousuoeve", U"拼音搜索Everything
 ```
 
 ### C++
-[原实现](ib-pinyin-cpp)（停止维护）
+[原实现](ib-pinyin-cpp/README.md)（停止维护）
 
-### [AutoHotkey v2](ib-pinyin/bindings/ahk2)
+### [AutoHotkey v2](ib-pinyin/bindings/ahk2/README.md)
 ```ahk
 #Include <IbPinyin>
 
@@ -221,10 +229,15 @@ Features:
 - ASCII search utils
 - `floor_char_boundary()` and `ceil_char_boundary()` polyfill
 
-## 其它拼音相关项目
+## See also
+### Projects using this library
+- [IbEverythingExt: Everything 拼音搜索, ローマ字検索, wildcard, quick select extension](https://github.com/Chaoses-Ib/IbEverythingExt)
+- [CS2.FindIt.Character](https://github.com/baka-gourd/CS2.FindIt.Character) (Cities: Skylines II mod)
+
+### 其它拼音相关项目
 语言 | 库 | 拼音 | 双拼 | 词典 | 匹配 | 其它
 --- | --- | --- | --- | --- | --- | ---
-Rust <br /> (C, AHK2) | ib-matcher/ib-pinyin | ✔️ Unicode | ✔️ | ❌ | ✔️ | 支持日文；支持正则表达式；性能优先；支持 Unicode 辅助平面汉字
+Rust <br /> (C, C#, AHK2) | ib-matcher/ib-pinyin | ✔️ Unicode | ✔️ | ❌ | ✔️ | 支持日文；支持正则表达式；性能优先；支持 Unicode 辅助平面汉字
 Rust <br /> ([Node.js](https://github.com/Brooooooklyn/pinyin)) | [rust-pinyin](https://github.com/mozillazg/rust-pinyin) | ✔️ Unicode | ❌ | ❌ | ❌
 Rust | [rust-pinyin](https://github.com/samlink/rust_pinyin) | 简拼 | ❌ | ❌ | ❌
 C# | [ToolGood.Words.Pinyin](https://github.com/toolgood/ToolGood.Words.Pinyin) | ✔️ | ❌ | ❌ | 单编码？
