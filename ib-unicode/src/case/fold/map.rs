@@ -1,3 +1,65 @@
+/*!
+Combinations of if-ladder, if-tree (bisection) and jump table.
+
+On rustc 1.91.0-nightly (c8ca44c98 2025-08-10):
+```c
+if ( a1 <= 0x1C7F )
+{
+  switch ( a1 )
+  {
+    case 65:
+      result = 97LL;
+      break;
+    case 66:
+      result = 98LL;
+      break;
+    ...
+  }
+} else if ( a1 <= 0x103FF ) {
+  switch ( a1 )
+  {
+    case 42560:
+      result = 42561LL;
+      break;
+    case 42561:
+    ...
+    case 43887:
+      return result;
+    ...
+  }
+} else if ( a1 <= 0x10C7F ) {
+  ...
+} else if ( a1 <= 0x1189F )
+{
+  ...
+}
+else {
+  switch ( a1 )
+  {
+    ...
+    default:
+      switch ( a1 )
+      {
+        case 71840:
+          result = 71872LL;
+          break;
+        ...
+        default:
+          switch ( a1 )
+          {
+            case 0x16E40:
+              result = 0x16E60LL;
+              break;
+            ...
+            default:
+              return result;
+          }
+      }
+  }
+}
+```
+*/
+
 pub fn fold(c: char) -> char {
     include!("map.in.rs")
 }

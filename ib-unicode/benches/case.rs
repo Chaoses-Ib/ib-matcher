@@ -26,6 +26,45 @@ pub fn criterion_benchmark(c: &mut Criterion) {
         });
     }
     {
+        assert_eq!('A'.to_simple_fold_case_phf(), 'a');
+        c.bench_function("simple_fold_phf/ascii_hit", |b| {
+            b.iter(|| black_box('A').to_simple_fold_case_phf())
+        });
+
+        assert_eq!('!'.to_simple_fold_case_phf(), '!');
+        c.bench_function("simple_fold_phf/ascii_miss", |b| {
+            b.iter(|| black_box('!').to_simple_fold_case_phf())
+        });
+
+        assert_eq!('Σ'.to_simple_fold_case_phf(), 'σ');
+        c.bench_function("simple_fold_phf/uni_hit", |b| {
+            b.iter(|| black_box('Σ').to_simple_fold_case_phf())
+        });
+
+        assert_eq!('う'.to_simple_fold_case_phf(), 'う');
+        c.bench_function("simple_fold_phf/uni_miss", |b| {
+            b.iter(|| black_box('う').to_simple_fold_case_phf())
+        });
+
+        c.bench_function("simple_fold_phf/uni_miss_long", |b| {
+            b.iter(|| {
+                for c in
+                    "『この素晴らしい世界に祝福を！』（このすばらしいせかいにしゅくふくを）".chars()
+                {
+                    black_box(black_box(c).to_simple_fold_case_phf());
+                }
+            })
+        });
+
+        c.bench_function("simple_fold_phf/mix", |b| {
+            b.iter(|| {
+                for c in "ascii1234う変".chars() {
+                    black_box(black_box(c).to_simple_fold_case_phf());
+                }
+            })
+        });
+    }
+    {
         assert_eq!('A'.to_simple_fold_case_map(), 'a');
         c.bench_function("simple_fold_fast/ascii_hit", |b| {
             b.iter(|| black_box('A').to_simple_fold_case_map())
@@ -44,6 +83,24 @@ pub fn criterion_benchmark(c: &mut Criterion) {
         assert_eq!('う'.to_simple_fold_case_map(), 'う');
         c.bench_function("simple_fold_fast/uni_miss", |b| {
             b.iter(|| black_box('う').to_simple_fold_case_map())
+        });
+
+        c.bench_function("simple_fold_fast/uni_miss_long", |b| {
+            b.iter(|| {
+                for c in
+                    "『この素晴らしい世界に祝福を！』（このすばらしいせかいにしゅくふくを）".chars()
+                {
+                    black_box(black_box(c).to_simple_fold_case_map());
+                }
+            })
+        });
+
+        c.bench_function("simple_fold_fast/mix", |b| {
+            b.iter(|| {
+                for c in "ascii1234う変".chars() {
+                    black_box(black_box(c).to_simple_fold_case_map());
+                }
+            })
         });
     }
     {

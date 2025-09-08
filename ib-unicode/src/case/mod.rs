@@ -70,6 +70,9 @@ pub trait CharCaseExt: Sealed {
     /// See [case folding](super::case#case-folding) for details.
     #[cfg(feature = "bench")]
     fn to_simple_fold_case_map(self) -> char;
+
+    // #[cfg(feature = "bench")]
+    // fn to_simple_fold_case_phf(self) -> char;
 }
 
 impl CharCaseExt for char {
@@ -107,6 +110,11 @@ impl CharCaseExt for char {
     fn to_simple_fold_case_map(self) -> char {
         fold::map::fold(self)
     }
+
+    // #[cfg(feature = "bench")]
+    // fn to_simple_fold_case_phf(self) -> char {
+    //     fold::ptr_hash::fold(self)
+    // }
 }
 
 pub trait StrCaseExt: Sealed {

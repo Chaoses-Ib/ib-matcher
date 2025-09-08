@@ -34,6 +34,8 @@ doc = ["dep:document-features"]
 bstr = { version = "1", default-features = false, optional = true }
 document-features = { version = "0.2.11", optional = true }
 memchr = { version = "2", optional = true }
+# epserde = "0.8.0"
+# ptr_hash = { version = "2.0.0-alpha.1", features = ["epserde"] }
 
 [dev-dependencies]
 criterion = "0.7"
