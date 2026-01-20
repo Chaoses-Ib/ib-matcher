@@ -34,6 +34,8 @@ use daachorse::{CharwiseDoubleArrayAhoCorasick, CharwiseDoubleArrayAhoCorasickBu
 
 use ib_unicode::str::RoundCharBoundaryExt;
 
+#[cfg(feature = "cache")]
+pub mod cache;
 pub mod data;
 
 /// [Hepburn romanization](https://en.wikipedia.org/wiki/Hepburn_romanization)
@@ -47,11 +49,11 @@ pub struct HepburnRomanizer {
 #[bon]
 impl HepburnRomanizer {
     /// [`HepburnRomanizer::default()`]
-    #[builder]
+    #[builder(builder_type = HepburnRomanizerBuilder, state_mod(vis = "pub(crate)"))]
     pub fn new(
-        #[builder(default = false)] kana: bool,
-        #[builder(default = false)] kanji: bool,
-        #[builder(default = false)] word: bool,
+        #[builder(default = false, getter(vis = "pub(crate)"))] kana: bool,
+        #[builder(default = false, getter(vis = "pub(crate)"))] kanji: bool,
+        #[builder(default = false, getter(vis = "pub(crate)"))] word: bool,
     ) -> Self {
         // // let start = UnsafeCell::new(0);
         // let mut start = 0;
