@@ -30,7 +30,7 @@ default = ["std", "unicode", "perf", "romaji-compress-words"]
 ## the `std` feature will result in the use of spin locks**. To use a regex
 ## engine without `std` and without spin locks, you'll need to drop down to
 ## use APIs that accept a `Cache` value explicitly.
-std = ["regex-automata?/std", "regex-syntax?/std", "logos?/std", "alloc"]
+std = ["regex-automata?/std", "regex-syntax?/std", "logos?/std", "alloc", "ib-romaji?/std"]
 ## Enables use of the `alloc` library. This is required for most
 ## APIs in this crate.
 alloc = ["regex-automata?/alloc"]
@@ -46,6 +46,9 @@ pinyin = ["dep:arraystring", "dep:bitflags"]
 romaji = ["dep:ib-romaji"]
 ## Binary size (and memory usage) -696 KiB (771 KiB if zstd is already used), romanizer build time +1.1 ms.
 romaji-compress-words = ["ib-romaji?/compress-words"]
+## Enable serialization/deserialization of HepburnRomanizer for caching initialization state.
+## When combined with `std`, also enables file-based caching via `HepburnRomanizer::cached()`.
+romaji-cache = ["ib-romaji?/cache"]
 
 #! ### Syntax
 ## Pattern syntax support. Equivalent to features `syntax-glob,syntax-ev`. See [`syntax`] for details.
