@@ -9,7 +9,10 @@ authors.workspace = true
 license.workspace = true
 
 [features]
-default = ["compress-words"]
+default = [
+    "std",
+    "compress-words",
+]
 
 ## Binary size (and memory usage) -696 KiB (771 KiB if zstd is already used), romanizer build time +1.1 ms.
 compress-words = ["dep:include-bytes-zstd"]
@@ -24,7 +27,7 @@ std = []
 doc = ["dep:document-features"]
 
 [dependencies]
-bon = "3"
+bon = "3.2"
 daachorse = "1"
 document-features = { version = "0.2", optional = true }
 ib-unicode = { version = "0.2", default-features = false, path = "../ib-unicode" }
