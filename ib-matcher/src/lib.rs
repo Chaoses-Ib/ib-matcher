@@ -160,7 +160,7 @@ Use [`regex::cp::Regex`] if:
 //! These can improve the performance by 5~10% at most.
 //!
 //! ## Crate features
-#![cfg_attr(docsrs, feature(doc_auto_cfg))]
+#![cfg_attr(docsrs, feature(doc_cfg))]
 #![cfg_attr(feature = "doc", doc = document_features::document_features!())]
 
 extern crate alloc;

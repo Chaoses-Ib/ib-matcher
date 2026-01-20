@@ -9,7 +9,7 @@ Fast Unicode utils.
 
 ## Crate features
 */
-#![cfg_attr(docsrs, feature(doc_auto_cfg))]
+#![cfg_attr(docsrs, feature(doc_cfg))]
 #![cfg_attr(feature = "doc", doc = document_features::document_features!())]
 pub mod ascii;
 pub mod case;
