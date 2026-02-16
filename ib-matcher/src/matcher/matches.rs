@@ -86,3 +86,30 @@ impl SubMatch {
         }
     }
 }
+
+/// - Assert non-partial by default.
+#[cfg(test)]
+#[macro_export]
+macro_rules! assert_match {
+    ($m:expr, $expected:expr) => {
+        // assert_eq!($m.map(|m| (m.start(), m.len())), $expected);
+        let m = $m;
+        assert_eq!(
+            (
+                m.as_ref().map(|m| (m.start(), m.len())),
+                m.is_some_and(|m| m.is_pattern_partial())
+            ),
+            ($expected, false)
+        );
+    };
+    ($m:expr, $expected:expr, partial) => {
+        let m = $m;
+        assert_eq!(
+            (
+                m.as_ref().map(|m| (m.start(), m.len())),
+                m.is_some_and(|m| m.is_pattern_partial())
+            ),
+            ($expected, true)
+        );
+    };
+}

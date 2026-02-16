@@ -929,19 +929,13 @@ where
 
 #[cfg(test)]
 mod test {
-    use crate::pinyin::PinyinNotation;
+    use crate::{assert_match, pinyin::PinyinNotation};
 
     use super::*;
 
-    #[macro_export]
-    macro_rules! assert_match {
-        ($m:expr, $expected:expr) => {
-            assert_eq!($m.map(|m| (m.start(), m.len())), $expected);
-        };
-    }
-
     fn assert_match(m: Option<Match>, expected: Option<(usize, usize)>) {
-        assert_eq!(m.map(|m| (m.start(), m.len())), expected);
+        // assert_eq!(m.map(|m| (m.start(), m.len())), expected);
+        assert_match!(m, expected);
     }
 
     #[test]
@@ -1169,7 +1163,7 @@ mod test {
             .mix_lang(true)
             .build();
         // b uru a(ra)
-        assert_match!(matcher.find("让这个世界变得更好"), Some((15, 9)));
+        assert_match!(matcher.find("让这个世界变得更好"), Some((15, 9)), partial);
 
         let matcher = IbMatcher::builder("shiraimu")
             .pinyin(PinyinMatchConfig::notations(
@@ -1205,10 +1199,20 @@ mod test {
             .romaji(romaji.shallow_clone())
             .mix_lang(true)
             .analyze(true)
-            .is_pattern_partial(true)
             .build();
         // hatsune odxyy
         assert_match!(matcher.find("初音殴打喜羊羊.gif"), Some((0, 21)));
+
+        // If set is_pattern_partial, the match will be partial as romaji is matched first.
+        // TODO: A option to try all cases?
+        let matcher = IbMatcher::builder("hatsuneodxyy")
+            .pinyin(pinyin.shallow_clone())
+            .romaji(romaji.shallow_clone())
+            .mix_lang(true)
+            .analyze(true)
+            .is_pattern_partial(true)
+            .build();
+        assert_match!(matcher.find("初音殴打喜羊羊.gif"), Some((0, 21)), partial);
     }
 
     #[test]

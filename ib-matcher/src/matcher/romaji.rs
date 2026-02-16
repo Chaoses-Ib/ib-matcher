@@ -87,7 +87,11 @@ mod tests {
             .romaji(romaji.clone())
             .is_pattern_partial(true)
             .build();
-        assert_match!(matcher.find("この素晴らしい世界に祝福を"), Some((0, 21)));
+        assert_match!(
+            matcher.find("この素晴らしい世界に祝福を"),
+            Some((0, 21)),
+            partial
+        );
     }
 
     #[test]
