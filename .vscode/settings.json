@@ -1,7 +1,11 @@
 {
-    "editor.formatOnSave": true,
+    // "editor.formatOnSave": true,
     "[rust]": {
+        "editor.formatOnSave": true,
         "editor.defaultFormatter": "rust-lang.rust-analyzer"
+    },
+    "[toml]": {
+        "editor.formatOnSave": false,
     },
     "[markdown]": {
         "editor.formatOnSave": false,
