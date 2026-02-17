@@ -1,6 +1,6 @@
 [package]
 name = "ib-romaji"
-version = "0.1.3"
+version = "0.2.0"
 edition = "2024"
 description = "A fast Japanese romanizer"
 keywords = ["romaji", "japanese", "cjk"]
@@ -38,6 +38,9 @@ name = "romaji"
 harness = false
 
 [dev-dependencies]
+ib-romaji = { path = ".", features = [
+    "cache",
+] }
 aho-corasick = "1"
 criterion = "0.6"
 indexmap = "2"

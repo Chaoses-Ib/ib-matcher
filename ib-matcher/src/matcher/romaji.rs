@@ -59,7 +59,10 @@ pub(crate) struct RomajiMatcher<'a> {
 
 #[cfg(test)]
 mod tests {
-    use crate::{assert_match, matcher::IbMatcher};
+    use crate::{
+        assert_match,
+        matcher::{IbMatcher, MatchConfig},
+    };
 
     use super::*;
 
@@ -92,6 +95,19 @@ mod tests {
             Some((0, 21)),
             partial
         );
+    }
+
+    #[test]
+    fn kanji_noma() {
+        let config = MatchConfig::builder()
+            .romaji(Default::default())
+            .starts_with(true)
+            .build();
+
+        let m = IbMatcher::with_config("mizukina", config.shallow_clone());
+        assert_match!(m.find("水樹奈々"), Some((0, 9)));
+        let m = IbMatcher::with_config("mizukinana", config.shallow_clone());
+        assert_match!(m.find("水樹奈々"), Some((0, 12)));
     }
 
     #[test]

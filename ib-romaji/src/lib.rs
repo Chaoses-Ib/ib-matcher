@@ -37,6 +37,10 @@ use ib_unicode::str::RoundCharBoundaryExt;
 #[cfg(feature = "cache")]
 pub mod cache;
 pub mod data;
+mod input;
+pub mod kanji;
+
+pub use input::Input;
 
 /// [Hepburn romanization](https://en.wikipedia.org/wiki/Hepburn_romanization)
 #[derive(Clone)]
@@ -177,12 +181,13 @@ impl HepburnRomanizer {
     ///
     /// ## See also
     /// [`romanize_vec()`](Self::romanize_vec) for a version that returns a `Vec` of all possible romanizations.
-    pub fn romanize_and_try_for_each<S: ?Sized + AsRef<str>, T>(
+    pub fn romanize_and_try_for_each<'h, S: Into<Input<'h>>, T>(
         &self,
-        s: &S,
+        input: S,
         mut f: impl FnMut(usize, &'static str) -> Option<T>,
     ) -> Option<T> {
-        let s = s.as_ref();
+        let input = input.into();
+        let s = input.as_ref();
         let s = &s[..s.floor_char_boundary_ib(data::WORD_MAX_LEN)];
 
         // self.ac.find(Input::new(s).anchored(Anchored::Yes))
@@ -211,15 +216,8 @@ impl HepburnRomanizer {
         }
 
         if self.kanji {
-            // let s = unsafe { str::from_utf8_unchecked(s) };
-            if let Some(kanji) = s.chars().next() {
-                // TODO: Binary search
-                for romaji in data::kanji_romajis(kanji) {
-                    // TODO: Always 3?
-                    if let Some(result) = f(kanji.len_utf8(), romaji) {
-                        return Some(result);
-                    }
-                }
+            if let Some(result) = self.romanize_kanji_and_try_for_each(input, f) {
+                return Some(result);
             }
         }
 
@@ -234,7 +232,7 @@ impl HepburnRomanizer {
     ///
     /// assert_eq!(HepburnRomanizer::default().romanize_vec("日本語"), vec![(9, "nippongo"), (3, "a"), (3, "aki"), (3, "bi"), (3, "chi"), (3, "he"), (3, "hi"), (3, "iru"), (3, "jitsu"), (3, "ka"), (3, "kou"), (3, "ku"), (3, "kusa"), (3, "nchi"), (3, "ni"), (3, "nichi"), (3, "nitsu"), (3, "su"), (3, "tachi")]);
     /// ```
-    pub fn romanize_vec<S: ?Sized + AsRef<str>>(&self, s: &S) -> Vec<(usize, &'static str)> {
+    pub fn romanize_vec<'h, S: Into<Input<'h>>>(&self, s: S) -> Vec<(usize, &'static str)> {
         let mut results = Vec::new();
         self.romanize_and_try_for_each(s, |len, romaji| {
             results.push((len, romaji));
@@ -246,25 +244,35 @@ impl HepburnRomanizer {
     /// Check if the string can be fully romanized.
     ///
     /// This function can be used to test if the string is a possible Japanese text or not.
-    pub fn is_romanizable<S: ?Sized + AsRef<str>>(&self, s: &S) -> bool {
-        let s = s.as_ref();
+    pub fn is_romanizable<'h, S: Into<Input<'h>>>(&self, s: S) -> bool {
+        let s = s.into();
         if s.is_empty() {
             return true;
         }
-        self.romanize_and_try_for_each(s, |len, _| self.is_romanizable(&s[len..]).then_some(()))
-            .is_some()
+        self.romanize_and_try_for_each(s, |len, _| {
+            self.is_romanizable(Input::new(s.haystack(), s.start() + len))
+                .then_some(())
+        })
+        .is_some()
     }
 
     /// Check if the string can be fully romanized to the given romaji.
-    pub fn is_romanizable_to<S: ?Sized + AsRef<str>>(&self, s: &S, romaji: &S) -> bool {
-        let s = s.as_ref();
+    pub fn is_romanizable_to<'h, S: Into<Input<'h>>>(
+        &self,
+        s: S,
+        romaji: &(impl ?Sized + AsRef<str>),
+    ) -> bool {
+        let s = s.into();
         let romaji = romaji.as_ref();
         if s.is_empty() {
             return romaji.is_empty();
         }
         self.romanize_and_try_for_each(s, |len, word_romaji| {
-            self.is_romanizable_to(&s[len..], romaji.strip_prefix(word_romaji)?)
-                .then_some(())
+            self.is_romanizable_to(
+                Input::new(s.haystack(), s.start() + len),
+                romaji.strip_prefix(word_romaji)?,
+            )
+            .then_some(())
         })
         .is_some()
     }
@@ -382,6 +390,9 @@ mod tests {
                 Some(v) => v,
                 None => continue,
             };
+            if matches!(kanji, kanji::NOMA_STR) {
+                continue;
+            }
 
             write!(out_kanjis, "'{kanji}'=>").unwrap();
 

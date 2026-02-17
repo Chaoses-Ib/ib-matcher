@@ -12,7 +12,7 @@ match kanji {
 '○'=>&["maru","rei","zero"],
 '◎'=>&["nijuumaru"],'⻌'=>&["shinnyou","shinnyuu"],
 '〃'=>&["onaji","onajiku"],
-'々'=>&["noma"],'〆'=>&["shime"],'〇'=>&["maru","rei","zero"],'〒'=>&["yuubin"],
+'〆'=>&["shime"],'〇'=>&["maru","rei","zero"],'〒'=>&["yuubin"],
 '〻'=>&["onaji"],
 '〼'=>&["masu"],'㋿'=>&["reiwa"],
 '㍻'=>&["heisei"],

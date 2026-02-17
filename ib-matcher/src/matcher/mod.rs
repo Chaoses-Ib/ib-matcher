@@ -694,7 +694,25 @@ where
                 "non-UTF-8 romaji match is not yet supported"
             );
             if let Some(m) = romaji.config.romanizer.romanize_and_try_for_each(
-                unsafe { str::from_utf8_unchecked(haystack.as_bytes()) },
+                // unsafe { str::from_utf8_unchecked(haystack.as_bytes()) },
+                // TODO: Ideally, IbMatcher should accept Input with start/span.
+                ib_romaji::Input::new(
+                    unsafe {
+                        let b = haystack.as_bytes();
+                        /*
+                        // https://github.com/rust-lang/rust/issues/119206
+                        core::str::from_raw_parts(
+                            b.as_ptr().sub(matched_len),
+                            b.len() + matched_len,
+                        )
+                        */
+                        str::from_utf8_unchecked(core::slice::from_raw_parts(
+                            b.as_ptr().sub(matched_len),
+                            b.len() + matched_len,
+                        ))
+                    },
+                    matched_len,
+                ),
                 |len, romaji| {
                     let match_len_next = matched_len + len;
                     match self.sub_test_pinyin::<2, T>(
