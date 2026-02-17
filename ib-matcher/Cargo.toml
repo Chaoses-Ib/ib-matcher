@@ -133,7 +133,7 @@ document-features = { version = "0.2", optional = true }
 ib-romaji = { version = "0.2", default-features = false, optional = true, path = "../ib-romaji" }
 ib-unicode = { version = "0.2", default-features = false, path = "../ib-unicode" }
 itertools = "0.14"
-logos = { version = "0.15", default-features = false, features = [
+logos = { version = ">=0.15,<0.17", default-features = false, features = [
     "export_derive",
 ], optional = true }
 # TODO: perf-dfa-full
