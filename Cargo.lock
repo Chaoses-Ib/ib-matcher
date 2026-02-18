@@ -445,6 +445,7 @@ dependencies = [
  "ib-unicode",
  "include-bytes-zstd",
  "indexmap",
+ "logos",
 ]
 
 [[package]]

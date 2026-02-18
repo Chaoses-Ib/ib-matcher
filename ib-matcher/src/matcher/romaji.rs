@@ -3,6 +3,30 @@ use std::borrow::Cow;
 use bon::Builder;
 use ib_romaji::HepburnRomanizer;
 
+/**
+## Partial matches
+Many Japanese words are composed of multiple kanas (Japanese letters),
+while each kana's romaji may be composed of multiple English letters.
+So unlike pinyin, there are three partial matching options in romaji matching:
+- No partial matching.
+
+  This is the default before v0.4.2, ib-romaji v0.2.
+
+  To use this option, you can set
+  [`RomajiMatchConfigBuilder::partial_word(false)`](RomajiMatchConfigBuilder::partial_word).
+  But it's probably not what users would want as some words can be pretty long.
+
+- Partially match words, but not kanas.
+
+  The became the default after v0.4.2, since the former default is confusing to new users.
+
+  TODO: Due to the current implementation, this may partially match a kanji.
+
+- Partially match both words and kanas.
+
+  To use this option, set [`IbMatcherBuilder::is_pattern_partial(true)`](super::IbMatcherBuilder::is_pattern_partial),
+  which also works the same for pinyin matching.
+*/
 /// ## Performance
 /// To avoid initialization cost, you should share one `romanizer` across all configs by either passing `&romanizer`:
 /// ```
@@ -30,6 +54,12 @@ pub struct RomajiMatchConfig<'a> {
     #[builder(default = false)]
     pub(crate) case_insensitive: bool,
 
+    /// Allow partially match a Japanese word.
+    ///
+    /// See [`RomajiMatchConfig`] for details.
+    #[builder(default = true)]
+    pub(crate) partial_word: bool,
+
     #[builder(default = true)]
     pub(crate) allow_partial_pattern: bool,
 }
@@ -47,6 +77,7 @@ impl<'a> RomajiMatchConfig<'a> {
         Self {
             romanizer: Cow::Borrowed(self.romanizer.as_ref()),
             case_insensitive: self.case_insensitive,
+            partial_word: self.partial_word,
             allow_partial_pattern: self.allow_partial_pattern,
         }
     }
@@ -55,6 +86,18 @@ impl<'a> RomajiMatchConfig<'a> {
 pub(crate) struct RomajiMatcher<'a> {
     pub config: RomajiMatchConfig<'a>,
     pub partial_pattern: bool,
+    pub partial_kana: bool,
+}
+
+impl<'a> RomajiMatcher<'a> {
+    pub fn new(config: RomajiMatchConfig<'a>, is_pattern_partial: bool) -> Self {
+        let partial_kana = is_pattern_partial && config.allow_partial_pattern;
+        Self {
+            partial_pattern: config.partial_word || partial_kana,
+            partial_kana,
+            config,
+        }
+    }
 }
 
 #[cfg(test)]
@@ -81,13 +124,48 @@ mod tests {
             .romaji(romaji.clone())
             .build();
         assert_match!(matcher.find("この素晴らしい世界に祝福を"), Some((0, 30)));
+    }
+
+    #[test]
+    fn partial() {
+        let romanizer = Default::default();
 
         let matcher = IbMatcher::builder("konosuba")
-            .romaji(romaji.clone())
+            .romaji(
+                RomajiMatchConfig::builder()
+                    .romanizer(&romanizer)
+                    .partial_word(false)
+                    .build(),
+            )
             .build();
         assert_match!(matcher.find("この素晴らしい世界に祝福を"), None);
+
+        let romaji = RomajiMatchConfig::builder().romanizer(&romanizer).build();
+
         let matcher = IbMatcher::builder("konosuba")
-            .romaji(romaji.clone())
+            .romaji(romaji.shallow_clone())
+            .build();
+        assert_match!(
+            matcher.find("この素晴らしい世界に祝福を"),
+            Some((0, 21)),
+            partial
+        );
+        let matcher = IbMatcher::builder("konosub")
+            .romaji(romaji.shallow_clone())
+            .build();
+        assert_match!(matcher.find("この素晴らしい世界に祝福を"), None);
+
+        let matcher = IbMatcher::builder("konosuba")
+            .romaji(romaji.shallow_clone())
+            .is_pattern_partial(true)
+            .build();
+        assert_match!(
+            matcher.find("この素晴らしい世界に祝福を"),
+            Some((0, 21)),
+            partial
+        );
+        let matcher = IbMatcher::builder("konosub")
+            .romaji(romaji.shallow_clone())
             .is_pattern_partial(true)
             .build();
         assert_match!(

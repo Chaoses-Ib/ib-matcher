@@ -58,7 +58,6 @@ assert!(matcher.is_match("拼音搜索Everything"));
 
 let matcher = IbMatcher::builder("konosuba")
     .romaji(RomajiMatchConfig::default())
-    .is_pattern_partial(true)
     .build();
 assert!(matcher.is_match("この素晴らしい世界に祝福を"));
 ```

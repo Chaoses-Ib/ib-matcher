@@ -25,7 +25,6 @@ assert!(matcher.is_match("拼音搜索Everything"));
 
 let matcher = IbMatcher::builder("konosuba")
     .romaji(RomajiMatchConfig::default())
-    .is_pattern_partial(true)
     .build();
 assert!(matcher.is_match("この素晴らしい世界に祝福を"));
 ```
@@ -77,6 +76,9 @@ pub struct MatchConfig<'a> {
     /// If `true`, the pattern can match pinyins/romajis starting with the ending of the pattern.
     ///
     /// For example, pattern "pinyi" can match "拼音" (whose pinyin is "pinyin") if `is_pattern_partial` is `true`.
+    ///
+    /// If you want, you can disable this for romaji matching separately by setting
+    /// [`RomajiMatchConfigBuilder::allow_partial_pattern(false)`](RomajiMatchConfigBuilder::allow_partial_pattern).
     #[builder(default = false)]
     is_pattern_partial: bool,
 
@@ -164,7 +166,6 @@ assert!(matcher.is_match("拼音搜索Everything"));
 
 let matcher = IbMatcher::builder("konosuba")
     .romaji(RomajiMatchConfig::default())
-    .is_pattern_partial(true)
     .build();
 assert!(matcher.is_match("この素晴らしい世界に祝福を"));
 ```
@@ -399,10 +400,7 @@ where
             pinyin,
 
             #[cfg(feature = "romaji")]
-            romaji: romaji.map(|config| RomajiMatcher {
-                partial_pattern: is_pattern_partial && config.allow_partial_pattern,
-                config,
-            }),
+            romaji: romaji.map(|config| RomajiMatcher::new(config, is_pattern_partial)),
 
             _haystack_str: PhantomData,
         }
@@ -882,6 +880,7 @@ where
         };
 
         if pattern_s.len() < pinyin.len() {
+            /*
             if match LANG {
                 #[cfg(feature = "pinyin")]
                 1 => unsafe { self.pinyin.as_ref().unwrap_unchecked() }.partial_pattern,
@@ -889,9 +888,29 @@ where
                 2 => unsafe { self.romaji.as_ref().unwrap_unchecked() }.partial_pattern,
                 _ => unreachable!(),
             } && pinyin.starts_with(pattern_s)
-            {
+            */
+            if match LANG {
+                #[cfg(feature = "pinyin")]
+                1 => {
+                    unsafe { self.pinyin.as_ref().unwrap_unchecked() }.partial_pattern
+                        && pinyin.starts_with(pattern_s)
+                }
+                #[cfg(feature = "romaji")]
+                2 => {
+                    let romaji = unsafe { self.romaji.as_ref().unwrap_unchecked() };
+                    romaji.partial_pattern
+                        && pinyin.starts_with(pattern_s)
+                        && (romaji.partial_kana
+                            || ib_romaji::HepburnRomanizer::is_romaji_kana_boundary(
+                                pinyin,
+                                pattern_s.len(),
+                            ))
+                }
+                _ => unreachable!(),
+            } {
                 return (
                     true,
+                    // TODO: partial_word/kana
                     Some(SubMatch::new(matched_len_next, true))
                         .filter(|_| !self.ends_with || haystack_next.as_bytes().is_empty())
                         .and_then(f),

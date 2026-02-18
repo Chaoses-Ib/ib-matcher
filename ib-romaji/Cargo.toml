@@ -32,6 +32,9 @@ daachorse = "1"
 document-features = { version = "0.2", optional = true }
 ib-unicode = { version = "0.2", default-features = false, path = "../ib-unicode" }
 include-bytes-zstd = { version = "0.1", optional = true }
+logos = { version = ">=0.15,<0.17", default-features = false, features = [
+    "export_derive",
+] }
 
 [[bench]]
 name = "romaji"
@@ -44,6 +47,10 @@ ib-romaji = { path = ".", features = [
 aho-corasick = "1"
 criterion = "0.6"
 indexmap = "2"
+
+[[bench]]
+name = "kana"
+harness = false
 
 [[bench]]
 name = "words"
