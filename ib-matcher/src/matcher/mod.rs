@@ -30,7 +30,7 @@ let matcher = IbMatcher::builder("konosuba")
 assert!(matcher.is_match("この素晴らしい世界に祝福を"));
 ```
 */
-use std::{fmt::Debug, marker::PhantomData};
+use core::{fmt::Debug, marker::PhantomData, num::NonZeroU8};
 
 use bon::{bon, Builder};
 
@@ -600,13 +600,19 @@ where
                 .and_then(f);
         }
 
-        self.sub_test_and_try_for_each::<0xFF, T>(&self.pattern, haystack, 0, &mut |submatch| {
-            f(Match {
-                start: 0,
-                end: submatch.len,
-                is_pattern_partial: submatch.is_pattern_partial,
-            })
-        })
+        self.sub_test_and_try_for_each::<0xFF, T>(
+            &self.pattern,
+            haystack,
+            0,
+            None,
+            &mut |submatch| {
+                f(Match {
+                    start: 0,
+                    end: submatch.len,
+                    is_pattern_partial: submatch.is_pattern_partial,
+                })
+            },
+        )
     }
 
     fn sub_test<const LANG: u8>(
@@ -615,7 +621,13 @@ where
         haystack: &HaystackStr,
         matched_len: usize,
     ) -> Option<SubMatch> {
-        self.sub_test_and_try_for_each::<LANG, SubMatch>(pattern, haystack, matched_len, &mut Some)
+        self.sub_test_and_try_for_each::<LANG, SubMatch>(
+            pattern,
+            haystack,
+            matched_len,
+            None,
+            &mut Some,
+        )
     }
 
     /// ## Arguments
@@ -630,6 +642,7 @@ where
         pattern: &[PatternChar],
         haystack: &HaystackStr,
         matched_len: usize,
+        _last_romaji_c: Option<NonZeroU8>,
         f: &mut impl FnMut(SubMatch) -> Option<T>,
     ) -> Option<T> {
         debug_assert!(!pattern.is_empty());
@@ -668,6 +681,7 @@ where
                         pattern_next,
                         haystack_next,
                         matched_len_next,
+                        None,
                         f,
                     )
                 };
@@ -714,18 +728,42 @@ where
                     matched_len,
                 ),
                 |len, romaji| {
-                    let match_len_next = matched_len + len;
-                    match self.sub_test_pinyin::<2, T>(
-                        pattern,
-                        unsafe { haystack.get_unchecked_from(len..) },
-                        match_len_next,
-                        romaji,
-                        f,
-                    ) {
-                        (true, Some(submatch)) => return Some(submatch),
-                        (true, None) => (),
-                        (false, None) => (),
-                        (false, Some(_)) => unreachable!(),
+                    /*
+                    if matched_len > 0 {
+                        // This is cursed
+                        let last_c = unsafe { (*pattern.as_ptr().sub(1)).c_lowercase };
+                    }
+                    */
+                    let mut pattern = pattern;
+                    let r = _last_romaji_c.is_none_or(|last_romaji_c| {
+                        if ib_romaji::HepburnRomanizer::need_apostrophe_c(
+                            last_romaji_c.get() as char,
+                            romaji,
+                        ) {
+                            if pattern_c.c == ib_romaji::HepburnRomanizer::APOSTROPHE {
+                                pattern = pattern_next;
+                                true
+                            } else {
+                                false
+                            }
+                        } else {
+                            true
+                        }
+                    });
+                    if r {
+                        let match_len_next = matched_len + len;
+                        match self.sub_test_pinyin::<2, T>(
+                            pattern,
+                            unsafe { haystack.get_unchecked_from(len..) },
+                            match_len_next,
+                            romaji,
+                            f,
+                        ) {
+                            (true, Some(submatch)) => return Some(submatch),
+                            (true, None) => (),
+                            (false, None) => (),
+                            (false, Some(_)) => unreachable!(),
+                        }
                     }
                     None
                 },
@@ -878,6 +916,9 @@ where
                 &pattern[pinyin.chars().count()..],
                 haystack_next,
                 matched_len_next,
+                Some(unsafe {
+                    NonZeroU8::new_unchecked(*pinyin.as_bytes().last().unwrap_unchecked())
+                }),
                 f,
             ) {
                 return (true, Some(submatch));

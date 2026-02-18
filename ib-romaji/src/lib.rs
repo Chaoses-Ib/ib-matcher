@@ -38,6 +38,7 @@ use ib_unicode::str::RoundCharBoundaryExt;
 pub mod cache;
 pub mod data;
 mod input;
+pub mod kana;
 pub mod kanji;
 
 pub use input::Input;
@@ -109,6 +110,9 @@ impl HepburnRomanizer {
 
     /// Romanize the first kana in the string, and return the length of the kana and the romaji.
     ///
+    /// ## Notes
+    /// - n apostrophe is properly handled in this function.
+    ///
     /// ## Example
     /// ```
     /// use ib_romaji::HepburnRomanizer;
@@ -166,6 +170,12 @@ impl HepburnRomanizer {
     /// Romanize the first word in the string, and call `f` for each possible romanization.
     ///
     /// `f` can return `Some(_)` to stop the iteration, or `None` to continue.
+    ///
+    /// ## Notes
+    /// - While n apostrophe (e.g. `n'a`) in words is handled,
+    ///   n apostrophe at start/end is not handled in this function for performance reason.
+    ///
+    ///   You should call [HepburnRomanizer::need_apostrophe(last_romaji, romaji)](HepburnRomanizer::need_apostrophe) to check and insert the apostrophe.
     ///
     /// ## Example
     /// ```
@@ -226,6 +236,8 @@ impl HepburnRomanizer {
 
     /// Romanize the first word in the string, and return a `Vec` for all possible romanization.
     ///
+    /// **See [`romanize_and_try_for_each`](Self::romanize_and_try_for_each) for caveats.**
+    ///
     /// ## Example
     /// ```
     /// use ib_romaji::HepburnRomanizer;
@@ -256,7 +268,30 @@ impl HepburnRomanizer {
         .is_some()
     }
 
+    fn is_romanizable_to_with_last(&self, s: Input, last_romaji: &str, romaji: &str) -> bool {
+        if s.is_empty() {
+            return romaji.is_empty();
+        }
+        self.romanize_and_try_for_each(s, |len, word_romaji| {
+            let romaji = if Self::need_apostrophe(last_romaji, word_romaji) {
+                romaji.strip_prefix(Self::APOSTROPHE)?
+            } else {
+                romaji
+            };
+            self.is_romanizable_to_with_last(
+                Input::new(s.haystack(), s.start() + len),
+                word_romaji,
+                romaji.strip_prefix(word_romaji)?,
+            )
+            .then_some(())
+        })
+        .is_some()
+    }
+
     /// Check if the string can be fully romanized to the given romaji.
+    ///
+    /// ## Notes
+    /// - n apostrophe is properly handled in this function.
     pub fn is_romanizable_to<'h, S: Into<Input<'h>>>(
         &self,
         s: S,
@@ -264,6 +299,7 @@ impl HepburnRomanizer {
     ) -> bool {
         let s = s.into();
         let romaji = romaji.as_ref();
+        /*
         if s.is_empty() {
             return romaji.is_empty();
         }
@@ -275,6 +311,8 @@ impl HepburnRomanizer {
             .then_some(())
         })
         .is_some()
+        */
+        self.is_romanizable_to_with_last(s, "", romaji)
     }
 }
 
@@ -358,6 +396,17 @@ mod tests {
         );
         assert_eq!(data.romanize_kana_str("って"), Some((6, "tte".into())));
         assert_eq!(data.romanize_kana_str("日は"), None);
+
+        // 平仮名-apostrophe-平仮名
+        assert_eq!(
+            data.romanize_kana_str("ぼたんゆき"),
+            Some((15, "botan'yuki".into()))
+        );
+        // 片仮名-apostrophe-平仮名
+        assert_eq!(
+            data.romanize_kana_str("ボタンゆき"),
+            Some((15, "botan'yuki".into()))
+        );
     }
 
     #[test]
@@ -371,6 +420,9 @@ mod tests {
         assert!(data.is_romanizable_to("日は", "kusaha"));
         assert!(!data.is_romanizable_to("今日", "kyou"));
         assert!(data.is_romanizable_to("今日", "imakusa"));
+
+        // Kana-apostrophe-kanji
+        assert!(data.is_romanizable_to("ぼたん雪", "botan'yuki"));
     }
 
     #[ignore]

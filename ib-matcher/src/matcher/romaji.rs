@@ -98,6 +98,66 @@ mod tests {
     }
 
     #[test]
+    fn n_apostrophe() {
+        let config = MatchConfig::builder()
+            .romaji(Default::default())
+            .starts_with(true)
+            .build();
+        let m = IbMatcher::with_config("kan", config.shallow_clone());
+        assert_match!(m.find("かん"), Some((0, 6)));
+        assert_match!(m.find("かに"), None);
+
+        let m = IbMatcher::with_config("kann", config.shallow_clone());
+        assert_match!(m.find("かんん"), Some((0, 9)));
+        assert_match!(m.find("かんに"), None);
+
+        let m = IbMatcher::with_config("kann'", config.shallow_clone());
+        // ' suffix is neither supported nor needed
+        assert_match!(m.find("かんん"), None);
+        assert_match!(m.find("かんに"), None);
+
+        let m = IbMatcher::with_config("kanni", config.shallow_clone());
+        // Unfortunately, in IME using "nn", this will be かんい
+        assert_match!(m.find("かんに"), Some((0, 9)));
+        assert_match!(m.find("かんんい"), None);
+
+        let m = IbMatcher::with_config("kann'i", config.shallow_clone());
+        assert_match!(m.find("かんに"), None);
+        assert_match!(m.find("かんんい"), Some((0, 12)));
+
+        let m = IbMatcher::with_config("botan'yuki", config.shallow_clone());
+        assert_match!(m.find("ボタン雪"), Some((0, 12)));
+    }
+
+    #[test]
+    fn n_apostrophe_partial() {
+        let config = MatchConfig::builder()
+            .romaji(Default::default())
+            .starts_with(true)
+            .is_pattern_partial(true)
+            .build();
+        let m = IbMatcher::with_config("kan", config.shallow_clone());
+        assert_match!(m.find("かん"), Some((0, 6)));
+        assert_match!(m.find("かに"), Some((0, 6)), partial);
+
+        let m = IbMatcher::with_config("kann", config.shallow_clone());
+        assert_match!(m.find("かんん"), Some((0, 9)));
+        assert_match!(m.find("かんに"), Some((0, 9)), partial);
+
+        let m = IbMatcher::with_config("kann'", config.shallow_clone());
+        assert_match!(m.find("かんん"), None);
+        assert_match!(m.find("かんに"), None);
+
+        let m = IbMatcher::with_config("kanni", config.shallow_clone());
+        assert_match!(m.find("かんに"), Some((0, 9)));
+        assert_match!(m.find("かんんい"), None);
+
+        let m = IbMatcher::with_config("kann'i", config.shallow_clone());
+        assert_match!(m.find("かんに"), None);
+        assert_match!(m.find("かんんい"), Some((0, 12)));
+    }
+
+    #[test]
     fn kanji_noma() {
         let config = MatchConfig::builder()
             .romaji(Default::default())
