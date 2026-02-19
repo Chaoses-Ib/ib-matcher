@@ -694,6 +694,7 @@ where
 
         #[cfg(feature = "romaji")]
         if let Some(romaji) = self.romaji.as_ref().filter(|_| const { LANG & 2 != 0 }) {
+            use ib_romaji::HepburnRomanizer as R;
             // const {
             //     assert!(
             //         HaystackStr::ELEMENT_LEN_BYTE == 1,
@@ -734,11 +735,14 @@ where
                     */
                     let mut pattern = pattern;
                     let r = _last_romaji_c.is_none_or(|last_romaji_c| {
-                        if ib_romaji::HepburnRomanizer::need_apostrophe_c(
-                            last_romaji_c.get() as char,
-                            romaji,
-                        ) {
-                            if pattern_c.c == ib_romaji::HepburnRomanizer::APOSTROPHE {
+                        let need_apostrophe =
+                            R::need_apostrophe_c(last_romaji_c.get() as char, romaji);
+                        #[cfg(false)]
+                        dbg!(pattern_c.s, romaji, need_apostrophe);
+                        if need_apostrophe {
+                            if pattern_c.c == R::APOSTROPHE
+                                || pattern_c.c == ib_romaji::convert::hepburn_ime::APOSTROPHE_ALT
+                            {
                                 pattern = pattern_next;
                                 true
                             } else {
@@ -899,7 +903,9 @@ where
                 2 => {
                     let romaji = unsafe { self.romaji.as_ref().unwrap_unchecked() };
                     romaji.partial_pattern
-                        && pinyin.starts_with(pattern_s)
+                        && ib_romaji::convert::hepburn_ime::romaji_starts_with_ignore_hepburn_ime(
+                            pinyin, pattern_s,
+                        )
                         && (romaji.partial_kana
                             || ib_romaji::HepburnRomanizer::is_romaji_kana_boundary(
                                 pinyin,
@@ -916,7 +922,12 @@ where
                         .and_then(f),
                 );
             }
-        } else if pattern_s.starts_with(pinyin) {
+        } else if match LANG {
+            #[cfg(feature = "romaji")]
+            2 => ib_romaji::convert::hepburn_ime::starts_with_ignore_hepburn_ime(pattern_s, pinyin),
+            #[cfg(feature = "pinyin")]
+            _ => pattern_s.starts_with(pinyin),
+        } {
             if pattern_s.len() == pinyin.len() {
                 return (
                     true,

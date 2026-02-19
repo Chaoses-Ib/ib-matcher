@@ -36,6 +36,7 @@ use ib_unicode::str::RoundCharBoundaryExt;
 
 #[cfg(feature = "cache")]
 pub mod cache;
+pub mod convert;
 pub mod data;
 mod input;
 pub mod kana;

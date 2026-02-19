@@ -249,6 +249,27 @@ mod tests {
     }
 
     #[test]
+    fn convert_hepburn_ime() {
+        let c = MatchConfig::builder().romaji(Default::default()).build();
+        assert_match!(
+            c.matcher("nisekainyonyo").find("キャンヰ世界ニョニョ"),
+            None
+        );
+        assert_match!(
+            c.matcher("n'isekainyonyo").find("キャンヰ世界ニョニョ"),
+            Some((6, 24))
+        );
+        assert_match!(
+            c.matcher("nnisekainyonyo").find("キャンヰ世界ﾆｮﾆｮ"),
+            Some((6, 24))
+        );
+
+        assert_match!(c.matcher("shuuseipatchi").find("修正パッチ"), Some((0, 15)));
+        assert_match!(c.matcher("shuuseipacchi").find("集成パッチ"), Some((0, 15)));
+        assert_match!(c.matcher("shuuseipacchi").find("終生パッチ"), Some((0, 15)));
+    }
+
+    #[test]
     fn min_haystack_len() {
         let romanizer = Default::default();
         let romaji = RomajiMatchConfig::builder().romanizer(&romanizer).build();
