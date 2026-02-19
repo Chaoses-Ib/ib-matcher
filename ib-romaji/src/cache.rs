@@ -11,7 +11,7 @@ impl HepburnRomanizer {
     /// Header magic bytes for cache file validation
     const CACHE_MAGIC: &'static [u8] = b"IBROMAJI";
     /// Cache format version
-    const CACHE_VERSION: u8 = 1;
+    const CACHE_VERSION: u8 = 2;
 
     /// Serialize the HepburnRomanizer to bytes for caching.
     ///

@@ -1,5 +1,17 @@
 //! A fast Japanese romanizer.
 //!
+/*!
+See [Romanization of Japanese](https://en.wikipedia.org/wiki/Romanization_of_Japanese) for what is romaji.
+
+## Features
+- Support characters with multiple readings (i.e. heteronyms, 同形異音語).
+- Support the following romanization systems:
+  - [Hepburn romanization system](https://en.wikipedia.org/wiki/Hepburn_romanization)
+  - Hepburn's [convenient IME variant](convert::hepburn_ime):
+    `n'` and `tch*` can be alternatively written as `nn` and `cch*` respectively.
+- Support handling of `n'` (n apostrophe, e.g. `n'ya` for `んや`).
+- Support [handling of 々(noma)](kanji#handling-of-々noma).
+*/
 //! ## Usage
 //! ```rust
 //! use ib_romaji::HepburnRomanizer;
@@ -26,7 +38,7 @@
 //!   - `build()` time: `split()`/memchr +10%
 //! - And this way the str can also be compressed and then streamly decompressed.
 //!
-//! ## Features
+//! ## Crate features
 #![cfg_attr(docsrs, feature(doc_cfg))]
 #![cfg_attr(feature = "doc", doc = document_features::document_features!())]
 use bon::bon;
@@ -36,7 +48,13 @@ use ib_unicode::str::RoundCharBoundaryExt;
 
 #[cfg(feature = "cache")]
 pub mod cache;
+pub mod convert;
 pub mod data;
+mod input;
+pub mod kana;
+pub mod kanji;
+
+pub use input::Input;
 
 /// [Hepburn romanization](https://en.wikipedia.org/wiki/Hepburn_romanization)
 #[derive(Clone)]
@@ -105,6 +123,9 @@ impl HepburnRomanizer {
 
     /// Romanize the first kana in the string, and return the length of the kana and the romaji.
     ///
+    /// ## Notes
+    /// - n apostrophe is properly handled in this function.
+    ///
     /// ## Example
     /// ```
     /// use ib_romaji::HepburnRomanizer;
@@ -163,6 +184,12 @@ impl HepburnRomanizer {
     ///
     /// `f` can return `Some(_)` to stop the iteration, or `None` to continue.
     ///
+    /// ## Notes
+    /// - While n apostrophe (e.g. `n'a`) in words is handled,
+    ///   n apostrophe at start/end is not handled in this function for performance reason.
+    ///
+    ///   You should call [HepburnRomanizer::need_apostrophe(last_romaji, romaji)](HepburnRomanizer::need_apostrophe) to check and insert the apostrophe.
+    ///
     /// ## Example
     /// ```
     /// use ib_romaji::HepburnRomanizer;
@@ -177,12 +204,13 @@ impl HepburnRomanizer {
     ///
     /// ## See also
     /// [`romanize_vec()`](Self::romanize_vec) for a version that returns a `Vec` of all possible romanizations.
-    pub fn romanize_and_try_for_each<S: ?Sized + AsRef<str>, T>(
+    pub fn romanize_and_try_for_each<'h, S: Into<Input<'h>>, T>(
         &self,
-        s: &S,
+        input: S,
         mut f: impl FnMut(usize, &'static str) -> Option<T>,
     ) -> Option<T> {
-        let s = s.as_ref();
+        let input = input.into();
+        let s = input.as_ref();
         let s = &s[..s.floor_char_boundary_ib(data::WORD_MAX_LEN)];
 
         // self.ac.find(Input::new(s).anchored(Anchored::Yes))
@@ -211,15 +239,8 @@ impl HepburnRomanizer {
         }
 
         if self.kanji {
-            // let s = unsafe { str::from_utf8_unchecked(s) };
-            if let Some(kanji) = s.chars().next() {
-                // TODO: Binary search
-                for romaji in data::kanji_romajis(kanji) {
-                    // TODO: Always 3?
-                    if let Some(result) = f(kanji.len_utf8(), romaji) {
-                        return Some(result);
-                    }
-                }
+            if let Some(result) = self.romanize_kanji_and_try_for_each(input, f) {
+                return Some(result);
             }
         }
 
@@ -228,13 +249,15 @@ impl HepburnRomanizer {
 
     /// Romanize the first word in the string, and return a `Vec` for all possible romanization.
     ///
+    /// **See [`romanize_and_try_for_each`](Self::romanize_and_try_for_each) for caveats.**
+    ///
     /// ## Example
     /// ```
     /// use ib_romaji::HepburnRomanizer;
     ///
     /// assert_eq!(HepburnRomanizer::default().romanize_vec("日本語"), vec![(9, "nippongo"), (3, "a"), (3, "aki"), (3, "bi"), (3, "chi"), (3, "he"), (3, "hi"), (3, "iru"), (3, "jitsu"), (3, "ka"), (3, "kou"), (3, "ku"), (3, "kusa"), (3, "nchi"), (3, "ni"), (3, "nichi"), (3, "nitsu"), (3, "su"), (3, "tachi")]);
     /// ```
-    pub fn romanize_vec<S: ?Sized + AsRef<str>>(&self, s: &S) -> Vec<(usize, &'static str)> {
+    pub fn romanize_vec<'h, S: Into<Input<'h>>>(&self, s: S) -> Vec<(usize, &'static str)> {
         let mut results = Vec::new();
         self.romanize_and_try_for_each(s, |len, romaji| {
             results.push((len, romaji));
@@ -246,27 +269,63 @@ impl HepburnRomanizer {
     /// Check if the string can be fully romanized.
     ///
     /// This function can be used to test if the string is a possible Japanese text or not.
-    pub fn is_romanizable<S: ?Sized + AsRef<str>>(&self, s: &S) -> bool {
-        let s = s.as_ref();
+    pub fn is_romanizable<'h, S: Into<Input<'h>>>(&self, s: S) -> bool {
+        let s = s.into();
         if s.is_empty() {
             return true;
         }
-        self.romanize_and_try_for_each(s, |len, _| self.is_romanizable(&s[len..]).then_some(()))
-            .is_some()
+        self.romanize_and_try_for_each(s, |len, _| {
+            self.is_romanizable(Input::new(s.haystack(), s.start() + len))
+                .then_some(())
+        })
+        .is_some()
     }
 
-    /// Check if the string can be fully romanized to the given romaji.
-    pub fn is_romanizable_to<S: ?Sized + AsRef<str>>(&self, s: &S, romaji: &S) -> bool {
-        let s = s.as_ref();
-        let romaji = romaji.as_ref();
+    fn is_romanizable_to_with_last(&self, s: Input, last_romaji: &str, romaji: &str) -> bool {
         if s.is_empty() {
             return romaji.is_empty();
         }
         self.romanize_and_try_for_each(s, |len, word_romaji| {
-            self.is_romanizable_to(&s[len..], romaji.strip_prefix(word_romaji)?)
-                .then_some(())
+            let romaji = if Self::need_apostrophe(last_romaji, word_romaji) {
+                romaji.strip_prefix(Self::APOSTROPHE)?
+            } else {
+                romaji
+            };
+            self.is_romanizable_to_with_last(
+                Input::new(s.haystack(), s.start() + len),
+                word_romaji,
+                romaji.strip_prefix(word_romaji)?,
+            )
+            .then_some(())
         })
         .is_some()
+    }
+
+    /// Check if the string can be fully romanized to the given romaji.
+    ///
+    /// ## Notes
+    /// - n apostrophe is properly handled in this function.
+    pub fn is_romanizable_to<'h, S: Into<Input<'h>>>(
+        &self,
+        s: S,
+        romaji: &(impl ?Sized + AsRef<str>),
+    ) -> bool {
+        let s = s.into();
+        let romaji = romaji.as_ref();
+        /*
+        if s.is_empty() {
+            return romaji.is_empty();
+        }
+        self.romanize_and_try_for_each(s, |len, word_romaji| {
+            self.is_romanizable_to(
+                Input::new(s.haystack(), s.start() + len),
+                romaji.strip_prefix(word_romaji)?,
+            )
+            .then_some(())
+        })
+        .is_some()
+        */
+        self.is_romanizable_to_with_last(s, "", romaji)
     }
 }
 
@@ -350,6 +409,17 @@ mod tests {
         );
         assert_eq!(data.romanize_kana_str("って"), Some((6, "tte".into())));
         assert_eq!(data.romanize_kana_str("日は"), None);
+
+        // 平仮名-apostrophe-平仮名
+        assert_eq!(
+            data.romanize_kana_str("ぼたんゆき"),
+            Some((15, "botan'yuki".into()))
+        );
+        // 片仮名-apostrophe-平仮名
+        assert_eq!(
+            data.romanize_kana_str("ボタンゆき"),
+            Some((15, "botan'yuki".into()))
+        );
     }
 
     #[test]
@@ -363,6 +433,9 @@ mod tests {
         assert!(data.is_romanizable_to("日は", "kusaha"));
         assert!(!data.is_romanizable_to("今日", "kyou"));
         assert!(data.is_romanizable_to("今日", "imakusa"));
+
+        // Kana-apostrophe-kanji
+        assert!(data.is_romanizable_to("ぼたん雪", "botan'yuki"));
     }
 
     #[ignore]
@@ -382,6 +455,9 @@ mod tests {
                 Some(v) => v,
                 None => continue,
             };
+            if matches!(kanji, kanji::NOMA_STR) {
+                continue;
+            }
 
             write!(out_kanjis, "'{kanji}'=>").unwrap();
 

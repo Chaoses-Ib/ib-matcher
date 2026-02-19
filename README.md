@@ -9,13 +9,15 @@ A multilingual, flexible and fast string, glob and regex matcher. Support 拼音
 - Unicode support
   - Fully UTF-8 support and limited support for UTF-16 and UTF-32.
   - Unicode case insensitivity ([simple case folding](https://docs.rs/ib-unicode/latest/ib_unicode/case/#case-folding)).
-- [Chinese pinyin](https://en.wikipedia.org/wiki/Pinyin) matching (拼音匹配)
+- [Chinese pinyin](#ib-pinyin) matching (拼音匹配)
   - Support characters with multiple readings (i.e. heteronyms, 多音字).
   - Support multiple pinyin notations, including [Quanpin (全拼)](https://zh.wikipedia.org/wiki/全拼), [Jianpin (简拼)](https://zh.wikipedia.org/wiki/简拼) and many [Shuangpin (双拼)](https://zh.wikipedia.org/wiki/%E5%8F%8C%E6%8B%BC) notations.
   - Support mixing multiple notations during matching.
-- [Japanese romaji](https://en.wikipedia.org/wiki/Romanization_of_Japanese) matching (ローマ字検索)
+- [Japanese romaji](#ib-romaji) matching (ローマ字検索)
   - Support characters with multiple readings (i.e. heteronyms, 同形異音語).
-  - Support [Hepburn romanization system](https://en.wikipedia.org/wiki/Hepburn_romanization) only at the moment.
+  - Support [Hepburn romanization system](https://en.wikipedia.org/wiki/Hepburn_romanization)
+    and its [convenient IME variant](https://docs.rs/ib-romaji/latest/ib_romaji/convert/hepburn_ime/).
+  - Support handling of `n'`/`nn` and [`々`](https://docs.rs/ib-romaji/latest/ib_romaji/kanji/#handling-of-々noma).
 - [glob()-style](https://docs.rs/ib-matcher/latest/ib_matcher/syntax/glob/) pattern matching (i.e. `?`, `*`, `[]` and `**`)
   - Support [different anchor modes](https://docs.rs/ib-matcher/latest/ib_matcher/syntax/glob/#anchor-modes), [treating surrounding wildcards as anchors](https://docs.rs/ib-matcher/latest/ib_matcher/syntax/glob/#surrounding-wildcards-as-anchors) and [special anchors in file paths](https://docs.rs/ib-matcher/latest/ib_matcher/syntax/glob/#anchors-in-file-paths).
   - Support two seperators (`//`) or a complement separator (`\`) as a glob star (`*/**`).
@@ -58,9 +60,34 @@ assert!(matcher.is_match("拼音搜索Everything"));
 
 let matcher = IbMatcher::builder("konosuba")
     .romaji(RomajiMatchConfig::default())
-    .is_pattern_partial(true)
     .build();
-assert!(matcher.is_match("この素晴らしい世界に祝福を"));
+assert!(matcher.is_match("『この素晴らしい世界に祝福を』"));
+// Matching is unanchored by default, you can set `b.starts_with(true)` for anchored one.
+```
+
+`MatchConfig` and Japanese romaji matching examples:
+```rust
+// cargo add ib-matcher --features romaji,macros
+use ib_matcher::{assert_match, matcher::MatchConfig};
+
+let c = MatchConfig::builder().romaji(Default::default()).build();
+// kya n
+assert_match!(c.matcher("kyan").find("キャン"), Some((0, 9)));
+// kya ni
+assert_match!(c.matcher("kyan").find("キャニ"), None);
+// Partial match (`b.is_pattern_partial()`) is disabled by default.
+
+// kya n(n'/nn) i se kai nyo nyo
+assert_match!(c.matcher("nisekainyonyo" ).find("キャンヰ世界ニョニョ"), None);
+assert_match!(c.matcher("n'isekainyonyo").find("キャンヰ世界ニョニョ"), Some((6, 24)));
+assert_match!(c.matcher("nnisekainyonyo").find("キャンヰ世界ﾆｮﾆｮ"   ), Some((6, 24)));
+
+// shu u se i pa tchi/cchi
+assert_match!(c.matcher("shuuseipatchi").find("修正パッチ"), Some((0, 15)));
+assert_match!(c.matcher("shuuseipacchi").find("集成パッチ"), Some((0, 15)));
+
+// shi ka no ko no ko no ko ko shi ta n ta n
+assert_match!(c.matcher("shikanokonokonokokoshitantan").find("鹿乃子のこのこ虎視眈々"), Some((0, 33)));
 ```
 
 ## glob()-style pattern matching
@@ -143,6 +170,9 @@ assert_eq!(&hay[re.find(hay).unwrap().span()], " this4me");
 ## [ib-pinyin](ib-pinyin/README.md)
 一个高性能 Rust 拼音查询、匹配库。
 
+See [Pinyin](https://en.wikipedia.org/wiki/Pinyin) for what is pinyin.
+
+Features:
 - 支持以下拼音编码方案：
   - 简拼（“py”）
   - 全拼（“pinyin”）
@@ -216,6 +246,17 @@ IsMatch := IbPinyin_Match("pysousuoeve", "拼音搜索Everything", IbPinyin_Asci
 [![Documentation](https://docs.rs/ib-romaji/badge.svg)](https://docs.rs/ib-romaji)
 
 A fast Japanese romanizer.
+
+See [Romanization of Japanese](https://en.wikipedia.org/wiki/Romanization_of_Japanese) for what is romaji.
+
+Features:
+- Support characters with multiple readings (i.e. heteronyms, 同形異音語).
+- Support the following romanization systems:
+  - [Hepburn romanization system](https://en.wikipedia.org/wiki/Hepburn_romanization)
+  - Hepburn's [convenient IME variant](https://docs.rs/ib-romaji/latest/ib_romaji/convert/hepburn_ime/):
+    `n'` and `tch*` can be alternatively written as `nn` and `cch*` respectively.
+- Support handling of `n'` (n apostrophe, e.g. `n'ya` for `んや`).
+- Support [handling of 々(noma)](https://docs.rs/ib-romaji/latest/ib_romaji/kanji/#handling-of-々noma).
 
 ## [ib-unicode](ib-unicode/README.md)
 [![crates.io](https://img.shields.io/crates/v/ib-unicode.svg)](https://crates.io/crates/ib-unicode)

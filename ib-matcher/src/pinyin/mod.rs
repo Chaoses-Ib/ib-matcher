@@ -1,4 +1,21 @@
-//! [Pinyin](https://en.wikipedia.org/wiki/Pinyin)
+/*!
+See [Pinyin](https://en.wikipedia.org/wiki/Pinyin) for what is pinyin.
+
+## Features
+- 支持以下拼音编码方案：
+  - 简拼（“py”）
+  - 全拼（“pinyin”）
+  - 带声调全拼（“pin1yin1”）
+  - Unicode（“pīnyīn”）
+  - 智能 ABC 双拼
+  - 拼音加加双拼
+  - 微软双拼
+  - 华宇双拼（紫光双拼）
+  - 小鹤双拼
+  - 自然码双拼
+- 支持多音字。
+- 支持 Unicode 辅助平面汉字。
+*/
 
 use std::ops::RangeInclusive;
 

@@ -25,12 +25,37 @@ assert!(matcher.is_match("拼音搜索Everything"));
 
 let matcher = IbMatcher::builder("konosuba")
     .romaji(RomajiMatchConfig::default())
-    .is_pattern_partial(true)
     .build();
-assert!(matcher.is_match("この素晴らしい世界に祝福を"));
+assert!(matcher.is_match("『この素晴らしい世界に祝福を』"));
+// Matching is unanchored by default, you can set `b.starts_with(true)` for anchored one.
+```
+
+`MatchConfig` and Japanese romaji matching examples:
+```
+// cargo add ib-matcher --features romaji,macros
+use ib_matcher::{assert_match, matcher::MatchConfig};
+
+let c = MatchConfig::builder().romaji(Default::default()).build();
+// kya n
+assert_match!(c.matcher("kyan").find("キャン"), Some((0, 9)));
+// kya ni
+assert_match!(c.matcher("kyan").find("キャニ"), None);
+// Partial match (`b.is_pattern_partial()`) is disabled by default.
+
+// kya n(n'/nn) i se kai nyo nyo
+assert_match!(c.matcher("nisekainyonyo" ).find("キャンヰ世界ニョニョ"), None);
+assert_match!(c.matcher("n'isekainyonyo").find("キャンヰ世界ニョニョ"), Some((6, 24)));
+assert_match!(c.matcher("nnisekainyonyo").find("キャンヰ世界ﾆｮﾆｮ"   ), Some((6, 24)));
+
+// shu u se i pa tchi/cchi
+assert_match!(c.matcher("shuuseipatchi").find("修正パッチ"), Some((0, 15)));
+assert_match!(c.matcher("shuuseipacchi").find("集成パッチ"), Some((0, 15)));
+
+// shi ka no ko no ko no ko ko shi ta n ta n
+assert_match!(c.matcher("shikanokonokonokokoshitantan").find("鹿乃子のこのこ虎視眈々"), Some((0, 33)));
 ```
 */
-use std::{fmt::Debug, marker::PhantomData};
+use core::{fmt::Debug, marker::PhantomData, num::NonZeroU8};
 
 use bon::{bon, Builder};
 
@@ -77,6 +102,9 @@ pub struct MatchConfig<'a> {
     /// If `true`, the pattern can match pinyins/romajis starting with the ending of the pattern.
     ///
     /// For example, pattern "pinyi" can match "拼音" (whose pinyin is "pinyin") if `is_pattern_partial` is `true`.
+    ///
+    /// If you want, you can disable this for romaji matching separately by setting
+    /// [`RomajiMatchConfigBuilder::allow_partial_pattern(false)`](RomajiMatchConfigBuilder::allow_partial_pattern).
     #[builder(default = false)]
     is_pattern_partial: bool,
 
@@ -130,6 +158,16 @@ impl<'a> MatchConfig<'a> {
             _data: PhantomData,
         }
     }
+
+    pub fn matcher<'p, HaystackStr>(
+        &'p self,
+        pattern: impl Into<Pattern<'p, HaystackStr>>,
+    ) -> IbMatcher<'p, HaystackStr>
+    where
+        HaystackStr: EncodedStr + ?Sized + 'p,
+    {
+        IbMatcher::with_config(pattern, self.shallow_clone())
+    }
 }
 
 struct PatternChar<'a> {
@@ -164,9 +202,9 @@ assert!(matcher.is_match("拼音搜索Everything"));
 
 let matcher = IbMatcher::builder("konosuba")
     .romaji(RomajiMatchConfig::default())
-    .is_pattern_partial(true)
     .build();
-assert!(matcher.is_match("この素晴らしい世界に祝福を"));
+assert!(matcher.is_match("『この素晴らしい世界に祝福を』"));
+// Matching is unanchored by default, you can set `b.starts_with(true)` for anchored one.
 ```
 */
 /// ## Design
@@ -399,10 +437,7 @@ where
             pinyin,
 
             #[cfg(feature = "romaji")]
-            romaji: romaji.map(|config| RomajiMatcher {
-                partial_pattern: is_pattern_partial && config.allow_partial_pattern,
-                config,
-            }),
+            romaji: romaji.map(|config| RomajiMatcher::new(config, is_pattern_partial)),
 
             _haystack_str: PhantomData,
         }
@@ -600,13 +635,19 @@ where
                 .and_then(f);
         }
 
-        self.sub_test_and_try_for_each::<0xFF, T>(&self.pattern, haystack, 0, &mut |submatch| {
-            f(Match {
-                start: 0,
-                end: submatch.len,
-                is_pattern_partial: submatch.is_pattern_partial,
-            })
-        })
+        self.sub_test_and_try_for_each::<0xFF, T>(
+            &self.pattern,
+            haystack,
+            0,
+            None,
+            &mut |submatch| {
+                f(Match {
+                    start: 0,
+                    end: submatch.len,
+                    is_pattern_partial: submatch.is_pattern_partial,
+                })
+            },
+        )
     }
 
     fn sub_test<const LANG: u8>(
@@ -615,7 +656,13 @@ where
         haystack: &HaystackStr,
         matched_len: usize,
     ) -> Option<SubMatch> {
-        self.sub_test_and_try_for_each::<LANG, SubMatch>(pattern, haystack, matched_len, &mut Some)
+        self.sub_test_and_try_for_each::<LANG, SubMatch>(
+            pattern,
+            haystack,
+            matched_len,
+            None,
+            &mut Some,
+        )
     }
 
     /// ## Arguments
@@ -630,6 +677,7 @@ where
         pattern: &[PatternChar],
         haystack: &HaystackStr,
         matched_len: usize,
+        _last_romaji_c: Option<NonZeroU8>,
         f: &mut impl FnMut(SubMatch) -> Option<T>,
     ) -> Option<T> {
         debug_assert!(!pattern.is_empty());
@@ -668,6 +716,7 @@ where
                         pattern_next,
                         haystack_next,
                         matched_len_next,
+                        None,
                         f,
                     )
                 };
@@ -682,6 +731,7 @@ where
 
         #[cfg(feature = "romaji")]
         if let Some(romaji) = self.romaji.as_ref().filter(|_| const { LANG & 2 != 0 }) {
+            use ib_romaji::HepburnRomanizer as R;
             // const {
             //     assert!(
             //         HaystackStr::ELEMENT_LEN_BYTE == 1,
@@ -694,20 +744,65 @@ where
                 "non-UTF-8 romaji match is not yet supported"
             );
             if let Some(m) = romaji.config.romanizer.romanize_and_try_for_each(
-                unsafe { str::from_utf8_unchecked(haystack.as_bytes()) },
+                // unsafe { str::from_utf8_unchecked(haystack.as_bytes()) },
+                // TODO: Ideally, IbMatcher should accept Input with start/span.
+                ib_romaji::Input::new(
+                    unsafe {
+                        let b = haystack.as_bytes();
+                        /*
+                        // https://github.com/rust-lang/rust/issues/119206
+                        core::str::from_raw_parts(
+                            b.as_ptr().sub(matched_len),
+                            b.len() + matched_len,
+                        )
+                        */
+                        str::from_utf8_unchecked(core::slice::from_raw_parts(
+                            b.as_ptr().sub(matched_len),
+                            b.len() + matched_len,
+                        ))
+                    },
+                    matched_len,
+                ),
                 |len, romaji| {
-                    let match_len_next = matched_len + len;
-                    match self.sub_test_pinyin::<2, T>(
-                        pattern,
-                        unsafe { haystack.get_unchecked_from(len..) },
-                        match_len_next,
-                        romaji,
-                        f,
-                    ) {
-                        (true, Some(submatch)) => return Some(submatch),
-                        (true, None) => (),
-                        (false, None) => (),
-                        (false, Some(_)) => unreachable!(),
+                    /*
+                    if matched_len > 0 {
+                        // This is cursed
+                        let last_c = unsafe { (*pattern.as_ptr().sub(1)).c_lowercase };
+                    }
+                    */
+                    let mut pattern = pattern;
+                    let r = _last_romaji_c.is_none_or(|last_romaji_c| {
+                        let need_apostrophe =
+                            R::need_apostrophe_c(last_romaji_c.get() as char, romaji);
+                        #[cfg(false)]
+                        dbg!(pattern_c.s, romaji, need_apostrophe);
+                        if need_apostrophe {
+                            if pattern_c.c == R::APOSTROPHE
+                                || pattern_c.c == ib_romaji::convert::hepburn_ime::APOSTROPHE_ALT
+                            {
+                                pattern = pattern_next;
+                                true
+                            } else {
+                                false
+                            }
+                        } else {
+                            true
+                        }
+                    });
+                    if r {
+                        let match_len_next = matched_len + len;
+                        match self.sub_test_pinyin::<2, T>(
+                            pattern,
+                            unsafe { haystack.get_unchecked_from(len..) },
+                            match_len_next,
+                            romaji,
+                            f,
+                        ) {
+                            (true, Some(submatch)) => return Some(submatch),
+                            (true, None) => (),
+                            (false, None) => (),
+                            (false, Some(_)) => unreachable!(),
+                        }
                     }
                     None
                 },
@@ -826,6 +921,7 @@ where
         };
 
         if pattern_s.len() < pinyin.len() {
+            /*
             if match LANG {
                 #[cfg(feature = "pinyin")]
                 1 => unsafe { self.pinyin.as_ref().unwrap_unchecked() }.partial_pattern,
@@ -833,15 +929,42 @@ where
                 2 => unsafe { self.romaji.as_ref().unwrap_unchecked() }.partial_pattern,
                 _ => unreachable!(),
             } && pinyin.starts_with(pattern_s)
-            {
+            */
+            if match LANG {
+                #[cfg(feature = "pinyin")]
+                1 => {
+                    unsafe { self.pinyin.as_ref().unwrap_unchecked() }.partial_pattern
+                        && pinyin.starts_with(pattern_s)
+                }
+                #[cfg(feature = "romaji")]
+                2 => {
+                    let romaji = unsafe { self.romaji.as_ref().unwrap_unchecked() };
+                    romaji.partial_pattern
+                        && ib_romaji::convert::hepburn_ime::romaji_starts_with_ignore_hepburn_ime(
+                            pinyin, pattern_s,
+                        )
+                        && (romaji.partial_kana
+                            || ib_romaji::HepburnRomanizer::is_romaji_kana_boundary(
+                                pinyin,
+                                pattern_s.len(),
+                            ))
+                }
+                _ => unreachable!(),
+            } {
                 return (
                     true,
+                    // TODO: partial_word/kana
                     Some(SubMatch::new(matched_len_next, true))
                         .filter(|_| !self.ends_with || haystack_next.as_bytes().is_empty())
                         .and_then(f),
                 );
             }
-        } else if pattern_s.starts_with(pinyin) {
+        } else if match LANG {
+            #[cfg(feature = "romaji")]
+            2 => ib_romaji::convert::hepburn_ime::starts_with_ignore_hepburn_ime(pattern_s, pinyin),
+            #[cfg(feature = "pinyin")]
+            _ => pattern_s.starts_with(pinyin),
+        } {
             if pattern_s.len() == pinyin.len() {
                 return (
                     true,
@@ -860,6 +983,9 @@ where
                 &pattern[pinyin.chars().count()..],
                 haystack_next,
                 matched_len_next,
+                Some(unsafe {
+                    NonZeroU8::new_unchecked(*pinyin.as_bytes().last().unwrap_unchecked())
+                }),
                 f,
             ) {
                 return (true, Some(submatch));
@@ -929,19 +1055,13 @@ where
 
 #[cfg(test)]
 mod test {
-    use crate::pinyin::PinyinNotation;
+    use crate::{assert_match, pinyin::PinyinNotation};
 
     use super::*;
 
-    #[macro_export]
-    macro_rules! assert_match {
-        ($m:expr, $expected:expr) => {
-            assert_eq!($m.map(|m| (m.start(), m.len())), $expected);
-        };
-    }
-
     fn assert_match(m: Option<Match>, expected: Option<(usize, usize)>) {
-        assert_eq!(m.map(|m| (m.start(), m.len())), expected);
+        // assert_eq!(m.map(|m| (m.start(), m.len())), expected);
+        assert_match!(m, expected);
     }
 
     #[test]
@@ -1169,7 +1289,7 @@ mod test {
             .mix_lang(true)
             .build();
         // b uru a(ra)
-        assert_match!(matcher.find("让这个世界变得更好"), Some((15, 9)));
+        assert_match!(matcher.find("让这个世界变得更好"), Some((15, 9)), partial);
 
         let matcher = IbMatcher::builder("shiraimu")
             .pinyin(PinyinMatchConfig::notations(
@@ -1205,10 +1325,20 @@ mod test {
             .romaji(romaji.shallow_clone())
             .mix_lang(true)
             .analyze(true)
-            .is_pattern_partial(true)
             .build();
         // hatsune odxyy
         assert_match!(matcher.find("初音殴打喜羊羊.gif"), Some((0, 21)));
+
+        // If set is_pattern_partial, the match will be partial as romaji is matched first.
+        // TODO: A option to try all cases?
+        let matcher = IbMatcher::builder("hatsuneodxyy")
+            .pinyin(pinyin.shallow_clone())
+            .romaji(romaji.shallow_clone())
+            .mix_lang(true)
+            .analyze(true)
+            .is_pattern_partial(true)
+            .build();
+        assert_match!(matcher.find("初音殴打喜羊羊.gif"), Some((0, 21)), partial);
     }
 
     #[test]
