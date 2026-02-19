@@ -5,6 +5,17 @@
 
 A fast Japanese romanizer.
 
+See [Romanization of Japanese](https://en.wikipedia.org/wiki/Romanization_of_Japanese) for what is romaji.
+
+## Features
+- Support characters with multiple readings (i.e. heteronyms, 同形異音語).
+- Support the following romanization systems:
+  - [Hepburn romanization system](https://en.wikipedia.org/wiki/Hepburn_romanization)
+  - Hepburn's [convenient IME variant](https://docs.rs/ib-romaji/latest/ib_romaji/convert/hepburn_ime/):
+    `n'` and `tch*` can be alternatively written as `nn` and `cch*` respectively.
+- Support handling of `n'` (n apostrophe, e.g. `n'ya` for `んや`).
+- Support [handling of 々(noma)](https://docs.rs/ib-romaji/latest/ib_romaji/kanji/#handling-of-々noma).
+
 ## Usage
 ```rust
 use ib_romaji::HepburnRomanizer;

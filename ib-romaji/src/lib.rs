@@ -1,5 +1,17 @@
 //! A fast Japanese romanizer.
 //!
+/*!
+See [Romanization of Japanese](https://en.wikipedia.org/wiki/Romanization_of_Japanese) for what is romaji.
+
+## Features
+- Support characters with multiple readings (i.e. heteronyms, 同形異音語).
+- Support the following romanization systems:
+  - [Hepburn romanization system](https://en.wikipedia.org/wiki/Hepburn_romanization)
+  - Hepburn's [convenient IME variant](convert::hepburn_ime):
+    `n'` and `tch*` can be alternatively written as `nn` and `cch*` respectively.
+- Support handling of `n'` (n apostrophe, e.g. `n'ya` for `んや`).
+- Support [handling of 々(noma)](kanji#handling-of-々noma).
+*/
 //! ## Usage
 //! ```rust
 //! use ib_romaji::HepburnRomanizer;
@@ -26,7 +38,7 @@
 //!   - `build()` time: `split()`/memchr +10%
 //! - And this way the str can also be compressed and then streamly decompressed.
 //!
-//! ## Features
+//! ## Crate features
 #![cfg_attr(docsrs, feature(doc_cfg))]
 #![cfg_attr(feature = "doc", doc = document_features::document_features!())]
 use bon::bon;

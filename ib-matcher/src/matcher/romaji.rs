@@ -246,6 +246,13 @@ mod tests {
         assert_match!(m.find("水樹奈々"), Some((0, 9)));
         let m = IbMatcher::with_config("mizukinana", config.shallow_clone());
         assert_match!(m.find("水樹奈々"), Some((0, 12)));
+
+        assert_match!(
+            config
+                .matcher("shikanokonokonokokoshitantan")
+                .find("鹿乃子のこのこ虎視眈々"),
+            Some((0, 33))
+        );
     }
 
     #[test]
@@ -263,6 +270,10 @@ mod tests {
             c.matcher("nnisekainyonyo").find("キャンヰ世界ﾆｮﾆｮ"),
             Some((6, 24))
         );
+
+        assert_match!(c.matcher("kyan").find("キャン"), Some((0, 9)));
+        // Partial match is disabled by default
+        assert_match!(c.matcher("kyan").find("キャニ"), None);
 
         assert_match!(c.matcher("shuuseipatchi").find("修正パッチ"), Some((0, 15)));
         assert_match!(c.matcher("shuuseipacchi").find("集成パッチ"), Some((0, 15)));

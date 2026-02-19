@@ -34,6 +34,8 @@ std = ["regex-automata?/std", "regex-syntax?/std", "logos?/std", "alloc", "ib-ro
 ## Enables use of the `alloc` library. This is required for most
 ## APIs in this crate.
 alloc = ["regex-automata?/alloc"]
+## Mainly for tests.
+macros = []
 
 #! ### Languages
 ## Unicode support.
@@ -158,6 +160,7 @@ regex-automata = { version = "0.4", default-features = false, features = [
     "perf-literal",
 ] }
 ib-matcher = { features = [
+    "macros",
     "pinyin",
     "romaji",
     "syntax",

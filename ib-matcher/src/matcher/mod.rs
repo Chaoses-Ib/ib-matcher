@@ -26,7 +26,33 @@ assert!(matcher.is_match("拼音搜索Everything"));
 let matcher = IbMatcher::builder("konosuba")
     .romaji(RomajiMatchConfig::default())
     .build();
-assert!(matcher.is_match("この素晴らしい世界に祝福を"));
+assert!(matcher.is_match("『この素晴らしい世界に祝福を』"));
+// Matching is unanchored by default, you can set `b.starts_with(true)` for anchored one.
+```
+
+`MatchConfig` and Japanese romaji matching examples:
+```
+// cargo add ib-matcher --features romaji,macros
+use ib_matcher::{assert_match, matcher::MatchConfig};
+
+let c = MatchConfig::builder().romaji(Default::default()).build();
+// kya n
+assert_match!(c.matcher("kyan").find("キャン"), Some((0, 9)));
+// kya ni
+assert_match!(c.matcher("kyan").find("キャニ"), None);
+// Partial match (`b.is_pattern_partial()`) is disabled by default.
+
+// kya n(n'/nn) i se kai nyo nyo
+assert_match!(c.matcher("nisekainyonyo" ).find("キャンヰ世界ニョニョ"), None);
+assert_match!(c.matcher("n'isekainyonyo").find("キャンヰ世界ニョニョ"), Some((6, 24)));
+assert_match!(c.matcher("nnisekainyonyo").find("キャンヰ世界ﾆｮﾆｮ"   ), Some((6, 24)));
+
+// shu u se i pa tchi/cchi
+assert_match!(c.matcher("shuuseipatchi").find("修正パッチ"), Some((0, 15)));
+assert_match!(c.matcher("shuuseipacchi").find("集成パッチ"), Some((0, 15)));
+
+// shi ka no ko no ko no ko ko shi ta n ta n
+assert_match!(c.matcher("shikanokonokonokokoshitantan").find("鹿乃子のこのこ虎視眈々"), Some((0, 33)));
 ```
 */
 use core::{fmt::Debug, marker::PhantomData, num::NonZeroU8};
@@ -177,7 +203,8 @@ assert!(matcher.is_match("拼音搜索Everything"));
 let matcher = IbMatcher::builder("konosuba")
     .romaji(RomajiMatchConfig::default())
     .build();
-assert!(matcher.is_match("この素晴らしい世界に祝福を"));
+assert!(matcher.is_match("『この素晴らしい世界に祝福を』"));
+// Matching is unanchored by default, you can set `b.starts_with(true)` for anchored one.
 ```
 */
 /// ## Design

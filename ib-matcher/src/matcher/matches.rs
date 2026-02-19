@@ -88,7 +88,7 @@ impl SubMatch {
 }
 
 /// - Assert non-partial by default.
-#[cfg(test)]
+#[cfg(any(test, feature = "macros"))]
 #[macro_export]
 macro_rules! assert_match {
     ($m:expr, $expected:expr) => {

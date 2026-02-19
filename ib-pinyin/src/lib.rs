@@ -1,5 +1,8 @@
 //! 一个高性能拼音查询、匹配库。
 //!
+/*!
+See [Pinyin](https://en.wikipedia.org/wiki/Pinyin) for what is pinyin.
+*/
 //! - 支持以下拼音编码方案：
 //!   - 简拼（“py”）
 //!   - 全拼（“pinyin”）
