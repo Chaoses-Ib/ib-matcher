@@ -132,6 +132,16 @@ impl<'a> MatchConfig<'a> {
             _data: PhantomData,
         }
     }
+
+    pub fn matcher<'p, HaystackStr>(
+        &'p self,
+        pattern: impl Into<Pattern<'p, HaystackStr>>,
+    ) -> IbMatcher<'p, HaystackStr>
+    where
+        HaystackStr: EncodedStr + ?Sized + 'p,
+    {
+        IbMatcher::with_config(pattern, self.shallow_clone())
+    }
 }
 
 struct PatternChar<'a> {
