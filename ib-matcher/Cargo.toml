@@ -132,7 +132,7 @@ arraystring = { version = "0.3", optional = true }
 bitflags = { version = "2", optional = true }
 bon = "3"
 document-features = { version = "0.2", optional = true }
-ib-romaji = { version = "0.2", default-features = false, optional = true, path = "../ib-romaji" }
+ib-romaji = { version = "0.2.1", default-features = false, optional = true, path = "../ib-romaji" }
 ib-unicode = { version = "0.2", default-features = false, path = "../ib-unicode" }
 itertools = "0.14"
 logos = { version = ">=0.15,<0.17", default-features = false, features = [

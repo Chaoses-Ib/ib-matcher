@@ -764,6 +764,8 @@ where
                     matched_len,
                 ),
                 |len, romaji| {
+                    #[cfg(false)]
+                    eprintln!("romaji={romaji}, len={len}");
                     /*
                     if matched_len > 0 {
                         // This is cursed
@@ -913,6 +915,11 @@ where
         pinyin: &str,
         f: &mut impl FnMut(SubMatch) -> Option<T>,
     ) -> (bool, Option<T>) {
+        #[cfg(false)]
+        eprintln!(
+            "pinyin={pinyin}, matched_len_next={matched_len_next}, haystack_next={}",
+            String::from_utf8_lossy(haystack_next.as_bytes()),
+        );
         debug_assert!(!pattern.is_empty());
         debug_assert_eq!(pinyin, pinyin.to_lowercase());
 

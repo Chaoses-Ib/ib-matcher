@@ -1,6 +1,6 @@
 [package]
 name = "ib-romaji"
-version = "0.2.0"
+version = "0.2.1"
 edition = "2024"
 description = "A fast Japanese romanizer"
 keywords = ["romaji", "japanese", "cjk"]
@@ -32,7 +32,7 @@ daachorse = "1"
 document-features = { version = "0.2", optional = true }
 ib-unicode = { version = "0.2", default-features = false, path = "../ib-unicode" }
 include-bytes-zstd = { version = "0.1", optional = true }
-logos = { version = ">=0.15,<0.17", default-features = false, features = [
+logos = { version = "0.16", default-features = false, features = [
     "export_derive",
 ] }
 
