@@ -1,6 +1,6 @@
 [package]
 name = "ib-matcher"
-version = "0.4.2"
+version = "0.4.3"
 edition = "2021"
 rust-version = "1.75"
 description = "A multilingual, flexible and fast string, glob and regex matcher. Support 拼音匹配 (Chinese pinyin match) and ローマ字検索 (Japanese romaji match)."
