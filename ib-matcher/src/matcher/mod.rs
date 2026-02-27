@@ -764,6 +764,8 @@ where
                     matched_len,
                 ),
                 |len, romaji| {
+                    #[cfg(false)]
+                    eprintln!("romaji={romaji}, len={len}");
                     /*
                     if matched_len > 0 {
                         // This is cursed
@@ -771,7 +773,7 @@ where
                     }
                     */
                     let mut pattern = pattern;
-                    let r = _last_romaji_c.is_none_or(|last_romaji_c| {
+                    let r = if let Some(last_romaji_c) = _last_romaji_c {
                         let need_apostrophe =
                             R::need_apostrophe_c(last_romaji_c.get() as char, romaji);
                         #[cfg(false)]
@@ -780,6 +782,19 @@ where
                             if pattern_c.c == R::APOSTROPHE
                                 || pattern_c.c == ib_romaji::convert::hepburn_ime::APOSTROPHE_ALT
                             {
+                                // Unfortunately, sub_test_pinyin() requires non-empty pattern,
+                                // but APOSTROPHE may be the last char, i.e. pattern ends with needed n apostrophe.
+                                // e.g. c.matcher("nn").find("ンヰ世界")
+                                // TODO: Analyze ahead?
+                                if pattern_next.is_empty() {
+                                    // Not matched_len_next
+                                    return Some(SubMatch::new(matched_len, false))
+                                        .filter(|_| {
+                                            // No need for `|| haystack_next.as_bytes().is_empty()`
+                                            !self.ends_with
+                                        })
+                                        .and_then(|m| f(m));
+                                }
                                 pattern = pattern_next;
                                 true
                             } else {
@@ -788,7 +803,9 @@ where
                         } else {
                             true
                         }
-                    });
+                    } else {
+                        true
+                    };
                     if r {
                         let match_len_next = matched_len + len;
                         match self.sub_test_pinyin::<2, T>(
@@ -898,6 +915,11 @@ where
         pinyin: &str,
         f: &mut impl FnMut(SubMatch) -> Option<T>,
     ) -> (bool, Option<T>) {
+        #[cfg(false)]
+        eprintln!(
+            "pinyin={pinyin}, matched_len_next={matched_len_next}, haystack_next={}",
+            String::from_utf8_lossy(haystack_next.as_bytes()),
+        );
         debug_assert!(!pattern.is_empty());
         debug_assert_eq!(pinyin, pinyin.to_lowercase());
 

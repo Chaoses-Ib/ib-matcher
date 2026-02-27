@@ -207,6 +207,29 @@ mod tests {
         assert_match!(m.find("ボタン雪"), Some((0, 12)));
     }
 
+    /// Without pattern_next.is_empty() check,
+    /// matcher will panic if pattern ends with needed n apostrophe.
+    #[test]
+    fn n_apostrophe_end() {
+        let c = MatchConfig::builder()
+            .romaji(Default::default())
+            .starts_with(true)
+            .build();
+        assert_match!(c.matcher("kann").find("かんん"), Some((0, 9)));
+        // ka n'i
+        assert_match!(c.matcher("kann").find("かんい"), Some((0, 9)), partial);
+        assert_match!(c.matcher("kann").find("かんい世界"), Some((0, 9)), partial);
+
+        // n ' i
+        assert_match!(c.matcher("nn").find("ンヰ"), Some((0, 3)));
+        assert_match!(c.matcher("nn").find("ンヰ世界"), Some((0, 3)));
+        // ka n ' i
+        assert_match!(c.matcher("kann").find("かんヰ"), Some((0, 6)));
+        assert_match!(c.matcher("kann").find("かんヰ世界"), Some((0, 6)));
+        assert_match!(c.matcher("kann").find("かん"), None);
+        assert_match!(c.matcher("kann").find(""), None);
+    }
+
     #[test]
     fn n_apostrophe_partial() {
         let config = MatchConfig::builder()
