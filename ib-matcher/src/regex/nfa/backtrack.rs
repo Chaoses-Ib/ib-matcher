@@ -274,7 +274,11 @@ impl Builder {
         Builder {
             config: Config::default(),
             #[cfg(feature = "syntax-regex")]
-            thompson: thompson::Compiler::new(),
+            thompson: {
+                let mut thompson = thompson::Compiler::new();
+                thompson.syntax(crate::regex::util::syntax::config_auto());
+                thompson
+            },
         }
     }
 

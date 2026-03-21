@@ -1,6 +1,6 @@
 [package]
 name = "ib-matcher"
-version = "0.4.3"
+version = "0.4.4"
 edition = "2021"
 rust-version = "1.75"
 description = "A multilingual, flexible and fast string, glob and regex matcher. Support 拼音匹配 (Chinese pinyin match) and ローマ字検索 (Japanese romaji match)."
@@ -90,6 +90,9 @@ regex-lita = [
 ]
 ## Enables all regex Unicode features. This feature is enabled by default, and will
 ## always cover all Unicode features, even if more are added in the future.
+##
+## - When disabled, regex syntax config's `unicode` will default to `false` to
+##   avoid reporting errors with character classes like `regex` crate does by default.
 regex-unicode = ["regex-automata?/unicode", "regex-syntax?/unicode"]
 
 #! ### Performance

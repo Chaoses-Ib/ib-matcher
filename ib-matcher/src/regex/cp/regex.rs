@@ -383,7 +383,7 @@ impl<'a> Regex<'a> {
     /// ```
     }))]
     pub fn builder(
-        #[builder(field)] syntax: util::syntax::Config,
+        #[builder(field)] syntax: Option<util::syntax::Config>,
         #[cfg(feature = "regex-callback")]
         #[builder(field)]
         callbacks: Vec<(String, Callback)>,
@@ -513,7 +513,7 @@ impl<'a, S: builder::State> Builder<'a, '_, S> {
     /// Ok::<(), Box<dyn std::error::Error>>(())
     /// ```
     pub fn syntax(mut self, syntax: util::syntax::Config) -> Self {
-        self.syntax = syntax;
+        self.syntax = Some(syntax);
         self
     }
 
@@ -586,7 +586,7 @@ impl<'a, S: builder::State> Builder<'a, '_, S> {
         // Bypass case_fold_char()
         // case_insensitive class and (?i) will be broken
         // .case_insensitive(false)
-        let syntax = self.syntax;
+        let syntax = self.syntax.unwrap_or_else(util::syntax::config_auto);
 
         // Parse
         let hirs = patterns

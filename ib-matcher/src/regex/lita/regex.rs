@@ -254,7 +254,7 @@ impl<'a> Regex<'a> {
     /// ```
     }))]
     pub fn builder(
-        #[builder(field)] syntax: util::syntax::Config,
+        #[builder(field)] syntax: Option<util::syntax::Config>,
         #[builder(finish_fn)] hir: Hir,
         /// If the provided `hir` is Unicode-aware, providing a ASCII-aware-only `Hir` as `hir_ascii` can improve performance.
         ///
@@ -362,7 +362,8 @@ impl<'a> Regex<'a> {
                     plain.maybe_ascii = false;
                 }
                 let cp = cp::Regex::builder()
-                    .syntax(syntax)
+                    // Unrelated to build_from_hir()
+                    // .syntax(syntax)
                     .configure(thompson)
                     .ib(ib)
                     .maybe_ib_parser(ib_parser)
@@ -416,7 +417,7 @@ impl<'a, S: builder::State> Builder<'a, '_, S> {
     /// Ok::<(), Box<dyn std::error::Error>>(())
     /// ```
     pub fn syntax(mut self, syntax: util::syntax::Config) -> Self {
-        self.syntax = syntax;
+        self.syntax = Some(syntax);
         self
     }
 
@@ -444,7 +445,8 @@ impl<'a, S: builder::State> Builder<'a, '_, S> {
     where
         S::HirAscii: builder::IsUnset,
     {
-        let syntax = self.syntax;
+        let syntax =
+            self.syntax.unwrap_or_else(util::syntax::config_auto);
 
         // Parse
         let pattern = pattern.as_ref();
