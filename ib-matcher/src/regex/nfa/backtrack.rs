@@ -1600,12 +1600,15 @@ impl BoundedBacktracker {
                     //     at += m.len();
                     // }
                     let mut first = true;
+                    // Test: backtrack_step_original_at()
+                    let original_at = at;
                     // TODO: Avoid is_ascii every time
                     // - [x] lita
                     // - [ ] Cache
                     matcher.test_and_try_for_each_opt::<true, _>(
                         &haystack[at..],
                         &mut |m| {
+                            // dbg!(haystack, at, &m);
                             if first {
                                 first = false;
                                 sid = next;
@@ -1613,7 +1616,7 @@ impl BoundedBacktracker {
                             } else {
                                 cache.stack.push(Frame::Step {
                                     sid: next,
-                                    at: at + m.end(),
+                                    at: original_at + m.end(),
                                 });
                             }
                             None::<()>
@@ -1626,15 +1629,17 @@ impl BoundedBacktracker {
                 #[cfg(feature = "regex-callback")]
                 super::State::Callback { ref callback, next } => {
                     let mut first = true;
+                    let original_at = at;
                     callback(input, at, &mut |len| {
                         if first {
                             first = false;
                             sid = next;
                             at += len;
                         } else {
-                            cache
-                                .stack
-                                .push(Frame::Step { sid: next, at: at + len });
+                            cache.stack.push(Frame::Step {
+                                sid: next,
+                                at: original_at + len,
+                            });
                         }
                     });
                     if first {

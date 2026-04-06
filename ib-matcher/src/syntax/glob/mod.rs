@@ -760,7 +760,11 @@ mod tests {
     use regex_automata::Match;
     use regex_syntax::ParserBuilder;
 
-    use crate::{matcher::MatchConfig, regex::lita::Regex};
+    use crate::{
+        matcher::{pattern::Pattern, MatchConfig, PinyinMatchConfig, RomajiMatchConfig},
+        pinyin::PinyinNotation,
+        regex::{lita::Regex, Input},
+    };
 
     use super::*;
 
@@ -1063,5 +1067,51 @@ mod tests {
         assert!(re.is_match(r"D:\C:\$RECYCLE.BIN\99") == false);
         assert!(re.is_match(r"DC:\$RECYCLE.BIN\9") == false);
         assert!(re.is_match(r"D:\DC:\$RECYCLE.BIN\9") == false);
+    }
+
+    #[test]
+    fn backtrack_step_original_at() {
+        // https://github.com/Chaoses-Ib/IbEverythingExt/blob/a6d1e5aa106eb5595299dd0ffa263157b3cdd25e/plugin/src/search/mod.rs#L185-L230
+        let re = Regex::builder()
+            .ib(MatchConfig::builder()
+                .case_insensitive(true)
+                // .is_pattern_partial(true)
+                .pinyin(
+                    PinyinMatchConfig::builder(
+                        PinyinNotation::AsciiFirstLetter | PinyinNotation::Ascii,
+                    )
+                    .allow_partial_pattern(false)
+                    .build(),
+                )
+                .romaji(RomajiMatchConfig::default())
+                // .analyze(true)
+                .build())
+            .ib_parser(&mut |pattern| {
+                Pattern::parse_ev(&pattern)
+                    .postmodifier_en(true)
+                    .postmodifier_py(true)
+                    .call()
+            })
+            .thompson(PathSeparator::Windows.look_matcher_config())
+            .build_from_hir(
+                parse_wildcard_path()
+                    .pattern_separator(PathSeparator::Any)
+                    .separator(PathSeparator::Windows)
+                    .ext(
+                        GlobExtConfig::builder()
+                            .two_separator_as_star(PathSeparator::Any, GlobStar::ToChild)
+                            .separator_as_star(
+                                PathSeparator::os_complement(),
+                                GlobStar::ToChildStart,
+                            )
+                            .build(),
+                    )
+                    .call(r"*a"),
+            )
+            .unwrap();
+        assert_eq!(
+            re.find(Input::new("卜算天 a").span(0..11)),
+            Some(Match::must(0, 10..11))
+        );
     }
 }

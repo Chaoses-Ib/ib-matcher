@@ -170,6 +170,7 @@ impl<'a> MatchConfig<'a> {
     }
 }
 
+#[derive(Debug)]
 struct PatternChar<'a> {
     c: char,
     c_lowercase: char,

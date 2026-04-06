@@ -72,7 +72,7 @@ pub trait OptionMatchExt: Sealed + Into<Option<Match>> + Sized {
 impl Sealed for Option<Match> {}
 impl OptionMatchExt for Option<Match> {}
 
-#[derive(Clone, Copy)]
+#[derive(Clone, Copy, Debug)]
 pub(crate) struct SubMatch {
     pub len: usize,
     pub is_pattern_partial: bool,
