@@ -86,6 +86,7 @@ where
         pinyin_notations,
         allow_partial_pattern,
         matcher: IbMatcher::builder(pattern)
+            .is_pattern_partial(allow_partial_pattern)
             .pinyin(
                 PinyinMatchConfig::builder(pinyin_notations)
                     .data(pinyin_data())
