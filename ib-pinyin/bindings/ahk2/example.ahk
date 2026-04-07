@@ -18,8 +18,13 @@ MsgBox(IsMatch)
 ; IbPinyin_DiletterThunisoft
 ; IbPinyin_DiletterXiaohe
 ; IbPinyin_DiletterZrm
+; IbPinyin_PatternPartial  ; 允许部分拼音匹配，例如用 "su" 匹配 "算"
 IsMatch := IbPinyin_Match("pysousuoeve", "拼音搜索Everything", IbPinyin_AsciiFirstLetter | IbPinyin_Ascii)
 MsgBox(IsMatch)
+
+; 部分拼音匹配示例：用 "su" 匹配 "算"
+IsMatch := IbPinyin_Match("su", "算", IbPinyin_Ascii | IbPinyin_PatternPartial)
+MsgBox(IsMatch)  ; 应该返回 true
 
 ; 获取匹配范围
 text := "拼音搜索Everything"

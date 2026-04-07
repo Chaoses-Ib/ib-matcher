@@ -12,6 +12,9 @@ use crate::{
     pinyin::{PinyinData, PinyinNotation},
 };
 
+mod flags;
+pub use flags::*;
+
 pub use crate::matcher::Match;
 
 pub fn pinyin_data() -> &'static PinyinData {
@@ -65,23 +68,26 @@ where
     HaystackStr: EncodedStr + ?Sized + ToOwned,
 {
     pattern: <HaystackStr as ToOwned>::Owned,
-    pinyin_notations: PinyinNotation,
+    flags: MatcherFlags,
     matcher: IbMatcher<'static, HaystackStr>,
 }
 
 fn get_or_init_matcher_cache<'a, HaystackStr>(
     matcher_cache: &'static OnceLock<RwLock<MatcherCache<HaystackStr>>>,
     pattern: &'a HaystackStr,
-    pinyin_notations: PinyinNotation,
+    flags: impl Into<MatcherFlags>,
 ) -> RwLockReadGuard<'static, MatcherCache<HaystackStr>>
 where
     HaystackStr: EncodedStr + ?Sized + ToOwned + 'static,
     <HaystackStr as ToOwned>::Owned: PartialEq<&'a HaystackStr>,
 {
+    let flags = flags.into();
+    let pinyin_notations = flags.into();
     let init = || MatcherCache {
         pattern: pattern.to_owned(),
-        pinyin_notations,
+        flags,
         matcher: IbMatcher::builder(pattern)
+            .is_pattern_partial(flags.contains(MatcherFlags::PatternPartial))
             .pinyin(
                 PinyinMatchConfig::builder(pinyin_notations)
                     .data(pinyin_data())
@@ -93,7 +99,7 @@ where
     let lock = matcher_cache.get_or_init(|| RwLock::new(init()));
 
     let guard = lock.read().unwrap();
-    if guard.pattern == pattern && guard.pinyin_notations == pinyin_notations {
+    if guard.pattern == pattern && guard.flags == flags {
         guard
     } else {
         drop(guard);
@@ -102,9 +108,9 @@ where
     }
 }
 
-pub fn is_pinyin_match(pattern: &str, haystack: &str, pinyin_notations: PinyinNotation) -> bool {
+pub fn is_pinyin_match(pattern: &str, haystack: &str, flags: impl Into<MatcherFlags>) -> bool {
     static MATCHER_CACHE: OnceLock<RwLock<MatcherCache<str>>> = OnceLock::new();
-    get_or_init_matcher_cache(&MATCHER_CACHE, pattern, pinyin_notations)
+    get_or_init_matcher_cache(&MATCHER_CACHE, pattern, flags)
         .matcher
         .is_match(haystack)
 }
@@ -113,10 +119,10 @@ pub fn is_pinyin_match(pattern: &str, haystack: &str, pinyin_notations: PinyinNo
 pub fn is_pinyin_match_u16(
     pattern: &widestring::U16Str,
     haystack: &widestring::U16Str,
-    pinyin_notations: PinyinNotation,
+    flags: impl Into<MatcherFlags>,
 ) -> bool {
     static MATCHER_CACHE: OnceLock<RwLock<MatcherCache<widestring::U16Str>>> = OnceLock::new();
-    get_or_init_matcher_cache(&MATCHER_CACHE, pattern, pinyin_notations)
+    get_or_init_matcher_cache(&MATCHER_CACHE, pattern, flags)
         .matcher
         .is_match(haystack)
 }
@@ -125,10 +131,10 @@ pub fn is_pinyin_match_u16(
 pub fn is_pinyin_match_u32(
     pattern: &widestring::U32Str,
     haystack: &widestring::U32Str,
-    pinyin_notations: PinyinNotation,
+    flags: impl Into<MatcherFlags>,
 ) -> bool {
     static MATCHER_CACHE: OnceLock<RwLock<MatcherCache<widestring::U32Str>>> = OnceLock::new();
-    get_or_init_matcher_cache(&MATCHER_CACHE, pattern, pinyin_notations)
+    get_or_init_matcher_cache(&MATCHER_CACHE, pattern, flags)
         .matcher
         .is_match(haystack)
 }
@@ -136,10 +142,10 @@ pub fn is_pinyin_match_u32(
 pub fn find_pinyin_match(
     pattern: &str,
     haystack: &str,
-    pinyin_notations: PinyinNotation,
+    flags: impl Into<MatcherFlags>,
 ) -> Option<Match> {
     static MATCHER_CACHE: OnceLock<RwLock<MatcherCache<str>>> = OnceLock::new();
-    get_or_init_matcher_cache(&MATCHER_CACHE, pattern, pinyin_notations)
+    get_or_init_matcher_cache(&MATCHER_CACHE, pattern, flags)
         .matcher
         .find(haystack)
 }
@@ -148,10 +154,10 @@ pub fn find_pinyin_match(
 pub fn find_pinyin_match_u16(
     pattern: &widestring::U16Str,
     haystack: &widestring::U16Str,
-    pinyin_notations: PinyinNotation,
+    flags: impl Into<MatcherFlags>,
 ) -> Option<Match> {
     static MATCHER_CACHE: OnceLock<RwLock<MatcherCache<widestring::U16Str>>> = OnceLock::new();
-    get_or_init_matcher_cache(&MATCHER_CACHE, pattern, pinyin_notations)
+    get_or_init_matcher_cache(&MATCHER_CACHE, pattern, flags)
         .matcher
         .find(haystack)
 }
@@ -160,10 +166,10 @@ pub fn find_pinyin_match_u16(
 pub fn find_pinyin_match_u32(
     pattern: &widestring::U32Str,
     haystack: &widestring::U32Str,
-    pinyin_notations: PinyinNotation,
+    flags: impl Into<MatcherFlags>,
 ) -> Option<Match> {
     static MATCHER_CACHE: OnceLock<RwLock<MatcherCache<widestring::U32Str>>> = OnceLock::new();
-    get_or_init_matcher_cache(&MATCHER_CACHE, pattern, pinyin_notations)
+    get_or_init_matcher_cache(&MATCHER_CACHE, pattern, flags)
         .matcher
         .find(haystack)
 }

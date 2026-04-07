@@ -1,0 +1,72 @@
+name: Build
+
+on:
+  push:
+    branches: [master, ahk-enhance-pattern-partial]
+  pull_request:
+    branches: [master]
+
+jobs:
+  build:
+    runs-on: ${{ matrix.os }}
+    strategy:
+      matrix:
+        include:
+          - os: ubuntu-latest
+            extension: so
+          - os: macos-latest
+            extension: dylib
+          - os: windows-latest
+            extension: dll
+    
+    steps:
+      - uses: actions/checkout@v4
+      
+      - name: Install Rust
+        uses: dtolnay/rust-toolchain@stable
+        
+      - name: Add Windows targets
+        if: matrix.os == 'windows-latest'
+        run: rustup target add x86_64-pc-windows-gnu i686-pc-windows-msvc
+        
+      - name: Build 64-bit
+        if: matrix.os == 'windows-latest'
+        run: cargo build --release -p ib-pinyin-c --target x86_64-pc-windows-gnu
+        
+      - name: Build 32-bit
+        if: matrix.os == 'windows-latest'
+        run: cargo build --release -p ib-pinyin-c --target i686-pc-windows-msvc
+        
+      - name: Build Unix
+        if: matrix.os != 'windows-latest'
+        run: cargo build --release -p ib-pinyin-c
+        
+      - name: Prepare Windows artifacts
+        if: matrix.os == 'windows-latest'
+        run: |
+          mkdir -p Lib
+          cp target/x86_64-pc-windows-gnu/release/ib_pinyin_c.dll Lib/IbPinyin64.dll
+          cp target/i686-pc-windows-msvc/release/ib_pinyin_c.dll Lib/IbPinyin32.dll
+          cp ib-pinyin/bindings/ahk2/Lib/IbPinyin.ahk Lib/IbPinyin.ahk
+          cp ib-pinyin/bindings/ahk2/Lib/IbPinyin.ahk Lib/IbPinyin32.ahk
+          powershell -Command "(Get-Content 'Lib/IbPinyin32.ahk').Replace('IbPinyin64', 'IbPinyin32').Replace('v2.0 64-bit', 'v2.0 32-bit') | Set-Content 'Lib/IbPinyin32.ahk'"
+          
+      - name: Create zip
+        if: matrix.os == 'windows-latest'
+        run: powershell -Command "Compress-Archive -Path 'Lib/*' -DestinationPath 'ib-pinyin-windows.zip' -Force"
+        
+      - name: Upload Windows artifact
+        if: matrix.os == 'windows-latest'
+        uses: actions/upload-artifact@v4
+        with:
+          name: ib-pinyin-windows
+          path: ib-pinyin-windows.zip
+          if-no-files-found: error
+          
+      - name: Upload Unix artifacts
+        if: matrix.os != 'windows-latest'
+        uses: actions/upload-artifact@v4
+        with:
+          name: ib-pinyin-${{ matrix.os }}
+          path: target/release/libib_pinyin_c.${{ matrix.extension }}
+          if-no-files-found: error

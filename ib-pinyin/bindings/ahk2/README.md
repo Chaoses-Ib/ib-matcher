@@ -42,6 +42,7 @@ MsgBox(IsMatch)
 ; IbPinyin_DiletterThunisoft
 ; IbPinyin_DiletterXiaohe
 ; IbPinyin_DiletterZrm
+; IbPinyin_PatternPartial  ; 允许部分拼音匹配，例如用 "su" 匹配 "算"
 IsMatch := IbPinyin_Match("pysousuoeve", "拼音搜索Everything", IbPinyin_AsciiFirstLetter | IbPinyin_Ascii)
 MsgBox(IsMatch)
 
