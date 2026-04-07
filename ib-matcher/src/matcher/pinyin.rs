@@ -163,8 +163,9 @@ mod tests {
 
     #[test]
     fn ordered_notations() {
+        let all = PinyinNotation::all() - PinyinNotation::PatternPartial;
         assert_eq!(
-            PinyinNotation::all().iter().count(),
+            all.iter().count(),
             PinyinMatcher::ORDERED_PINYIN_NOTATIONS.len()
         )
     }

@@ -78,6 +78,8 @@ where
     HaystackStr: EncodedStr + ?Sized + ToOwned + 'static,
     <HaystackStr as ToOwned>::Owned: PartialEq<&'a HaystackStr>,
 {
+    let allow_partial_pattern = pinyin_notations.contains(PinyinNotation::PatternPartial);
+    let pinyin_notations = pinyin_notations.difference(PinyinNotation::PatternPartial);
     let init = || MatcherCache {
         pattern: pattern.to_owned(),
         pinyin_notations,
@@ -85,6 +87,7 @@ where
             .pinyin(
                 PinyinMatchConfig::builder(pinyin_notations)
                     .data(pinyin_data())
+                    .allow_partial_pattern(allow_partial_pattern)
                     .build(),
             )
             .build(),
