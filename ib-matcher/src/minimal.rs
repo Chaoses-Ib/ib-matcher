@@ -66,6 +66,7 @@ where
 {
     pattern: <HaystackStr as ToOwned>::Owned,
     pinyin_notations: PinyinNotation,
+    allow_partial_pattern: bool,
     matcher: IbMatcher<'static, HaystackStr>,
 }
 
@@ -83,6 +84,7 @@ where
     let init = || MatcherCache {
         pattern: pattern.to_owned(),
         pinyin_notations,
+        allow_partial_pattern,
         matcher: IbMatcher::builder(pattern)
             .pinyin(
                 PinyinMatchConfig::builder(pinyin_notations)
@@ -96,7 +98,10 @@ where
     let lock = matcher_cache.get_or_init(|| RwLock::new(init()));
 
     let guard = lock.read().unwrap();
-    if guard.pattern == pattern && guard.pinyin_notations == pinyin_notations {
+    if guard.pattern == pattern
+        && guard.pinyin_notations == pinyin_notations
+        && guard.allow_partial_pattern == allow_partial_pattern
+    {
         guard
     } else {
         drop(guard);
