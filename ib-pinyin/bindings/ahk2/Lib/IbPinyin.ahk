@@ -17,6 +17,7 @@ IbPinyin_DiletterMicrosoft := 0x40
 IbPinyin_DiletterThunisoft := 0x80
 IbPinyin_DiletterXiaohe := 0x100
 IbPinyin_DiletterZrm := 0x200
+IbPinyin_PatternPartial := 0x400
 
 IbPinyin_IsMatch(pattern, haystack, notations := IbPinyin_AsciiFirstLetter | IbPinyin_Ascii)
 {
