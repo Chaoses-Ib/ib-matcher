@@ -2,10 +2,7 @@
 mod ffi {
     use std::ffi::CStr;
 
-    use ::ib_pinyin::{
-        minimal::{self, Match},
-        pinyin::PinyinNotation,
-    };
+    use ::ib_pinyin::minimal::{self, Match, MatcherFlags};
     use widestring::{U16CStr, U16Str, U32CStr, U32Str};
 
     /// https://github.com/rust-diplomat/diplomat/issues/392
@@ -18,7 +15,7 @@ mod ffi {
             minimal::is_pinyin_match(
                 pattern,
                 haystack,
-                PinyinNotation::from_bits_truncate(pinyin_notations),
+                MatcherFlags::from_bits_truncate(pinyin_notations),
             )
         }
 
@@ -44,7 +41,7 @@ mod ffi {
             minimal::is_pinyin_match_u16(
                 unsafe { U16Str::from_ptr(pattern as *const u16, pattern_len) },
                 unsafe { U16Str::from_ptr(haystack as *const u16, haystack_len) },
-                PinyinNotation::from_bits_truncate(pinyin_notations),
+                MatcherFlags::from_bits_truncate(pinyin_notations),
             )
         }
 
@@ -52,7 +49,7 @@ mod ffi {
             minimal::is_pinyin_match_u16(
                 unsafe { U16CStr::from_ptr_str(pattern as *const u16) }.as_ustr(),
                 unsafe { U16CStr::from_ptr_str(haystack as *const u16) }.as_ustr(),
-                PinyinNotation::from_bits_truncate(pinyin_notations),
+                MatcherFlags::from_bits_truncate(pinyin_notations),
             )
         }
 
@@ -66,7 +63,7 @@ mod ffi {
             minimal::is_pinyin_match_u32(
                 unsafe { U32Str::from_ptr(pattern as *const u32, pattern_len) },
                 unsafe { U32Str::from_ptr(haystack as *const u32, haystack_len) },
-                PinyinNotation::from_bits_truncate(pinyin_notations),
+                MatcherFlags::from_bits_truncate(pinyin_notations),
             )
         }
 
@@ -74,7 +71,7 @@ mod ffi {
             minimal::is_pinyin_match_u32(
                 unsafe { U32CStr::from_ptr_str(pattern as *const u32) }.as_ustr(),
                 unsafe { U32CStr::from_ptr_str(haystack as *const u32) }.as_ustr(),
-                PinyinNotation::from_bits_truncate(pinyin_notations),
+                MatcherFlags::from_bits_truncate(pinyin_notations),
             )
         }
 
@@ -93,7 +90,7 @@ mod ffi {
             Self::match_to_u64(minimal::find_pinyin_match(
                 pattern,
                 haystack,
-                PinyinNotation::from_bits_truncate(pinyin_notations),
+                MatcherFlags::from_bits_truncate(pinyin_notations),
             ))
         }
 
@@ -118,7 +115,7 @@ mod ffi {
             Self::match_to_u64(minimal::find_pinyin_match_u16(
                 unsafe { U16Str::from_ptr(pattern as *const u16, pattern_len) },
                 unsafe { U16Str::from_ptr(haystack as *const u16, haystack_len) },
-                PinyinNotation::from_bits_truncate(pinyin_notations),
+                MatcherFlags::from_bits_truncate(pinyin_notations),
             ))
         }
 
@@ -126,7 +123,7 @@ mod ffi {
             Self::match_to_u64(minimal::find_pinyin_match_u16(
                 unsafe { U16CStr::from_ptr_str(pattern as *const u16) }.as_ustr(),
                 unsafe { U16CStr::from_ptr_str(haystack as *const u16) }.as_ustr(),
-                PinyinNotation::from_bits_truncate(pinyin_notations),
+                MatcherFlags::from_bits_truncate(pinyin_notations),
             ))
         }
 
@@ -140,7 +137,7 @@ mod ffi {
             Self::match_to_u64(minimal::find_pinyin_match_u32(
                 unsafe { U32Str::from_ptr(pattern as *const u32, pattern_len) },
                 unsafe { U32Str::from_ptr(haystack as *const u32, haystack_len) },
-                PinyinNotation::from_bits_truncate(pinyin_notations),
+                MatcherFlags::from_bits_truncate(pinyin_notations),
             ))
         }
 
@@ -148,7 +145,7 @@ mod ffi {
             Self::match_to_u64(minimal::find_pinyin_match_u32(
                 unsafe { U32CStr::from_ptr_str(pattern as *const u32) }.as_ustr(),
                 unsafe { U32CStr::from_ptr_str(haystack as *const u32) }.as_ustr(),
-                PinyinNotation::from_bits_truncate(pinyin_notations),
+                MatcherFlags::from_bits_truncate(pinyin_notations),
             ))
         }
     }
