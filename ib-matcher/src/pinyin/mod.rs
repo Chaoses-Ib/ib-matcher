@@ -113,7 +113,6 @@ impl PinyinData {
             PinyinNotation::DiletterThunisoft => &self.diletter_thunisoft,
             PinyinNotation::DiletterXiaohe => &self.diletter_xiaohe,
             PinyinNotation::DiletterZrm => &self.diletter_zrm,
-            PinyinNotation::PatternPartial => unreachable!(),
             _ => unreachable!(),
         }
     }
@@ -134,7 +133,6 @@ impl PinyinData {
         #[cfg(feature = "inmut-data")] this: &Self,
         notations: PinyinNotation,
     ) {
-        let notations = notations.difference(PinyinNotation::PatternPartial);
         for notation in notations.iter() {
             match notation {
                 PinyinNotation::Unicode => (),
@@ -188,7 +186,6 @@ impl PinyinData {
                         PinyinNotation::DiletterThunisoft => &mut this.diletter_thunisoft,
                         PinyinNotation::DiletterXiaohe => &mut this.diletter_xiaohe,
                         PinyinNotation::DiletterZrm => &mut this.diletter_zrm,
-                        PinyinNotation::PatternPartial => unreachable!(),
                         _ => unreachable!(),
                     }
                     .get_or_insert_with(init);
@@ -354,7 +351,6 @@ impl<'a> Pinyin<'a> {
             PinyinNotation::AsciiFirstLetter => {
                 get(&self.data.ascii).map(|ascii| unsafe { ascii.get_unchecked(..1) })
             }
-            PinyinNotation::PatternPartial => None,
             _ => get(self.data.notation(notation)),
         }
     }
@@ -435,14 +431,14 @@ mod tests {
 
     #[test]
     fn get_pinyins() {
-        let data = PinyinData::new(PinyinNotation::all() - PinyinNotation::PatternPartial);
+        let data = PinyinData::new(PinyinNotation::all());
 
         assert_eq!(data.get_pinyins('中').count(), 2);
 
         for pinyin in data.get_pinyins('中') {
             println!("{:?}", pinyin);
 
-            for notation in (PinyinNotation::all() - PinyinNotation::PatternPartial).iter() {
+            for notation in PinyinNotation::all().iter() {
                 assert!(pinyin.notation(notation).is_some_and(|py| !py.is_empty()));
             }
         }

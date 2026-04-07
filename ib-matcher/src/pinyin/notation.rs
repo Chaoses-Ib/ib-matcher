@@ -70,11 +70,6 @@ bitflags::bitflags! {
         /// See [自然码](https://zh.wikipedia.org/zh-cn/自然码) for details.
         #[doc(alias = "自然码双拼")]
         const DiletterZrm = 0x200;
-
-        /// 允许部分拼音匹配
-        ///
-        /// 允许用不完整的拼音匹配，例如用 "su" 匹配 "算"
-        const PatternPartial = 0x400;
     }
 }
 
