@@ -196,8 +196,6 @@ extern crate alloc;
 pub mod matcher;
 #[cfg(feature = "minimal")]
 pub mod minimal;
-#[cfg(feature = "pinyin")]
-pub mod pinyin;
 #[cfg(feature = "regex-automata")]
 pub mod regex;
 #[cfg(any(
@@ -207,6 +205,8 @@ pub mod regex;
 ))]
 pub mod syntax;
 
+#[cfg(feature = "pinyin")]
+pub use ib_pinyin_data as pinyin;
 #[cfg(feature = "romaji")]
 pub use ib_romaji as romaji;
 pub use ib_unicode as unicode;

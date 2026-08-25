@@ -37,7 +37,7 @@ Bindings for other languages:
 - C/C++
   - [ib-pinyin-c](ib-pinyin/bindings/c/README.md) (Chinese pinyin matching)
   - [ib-bridge](https://github.com/baka-gourd/ib-matcher/tree/master/ib-bridge/rust) (Chinese pinyin and Japanese romaji matching)
-  - [ib-pinyin-cpp](ib-pinyin-cpp/README.md) (port, Chinese pinyin querying, discontinued)
+  - [ib-pinyin-cpp](ib-pinyin-cpp/README.md) (port, Chinese pinyin querying)
 - .NET: [IbMatcher.Net](https://github.com/baka-gourd/IbMatcher.Net) / [IbBridge](https://github.com/baka-gourd/ib-matcher/tree/master/ib-bridge) (Chinese pinyin and Japanese romaji matching)
 - AutoHotkey v2: [ib-pinyin-ahk2](ib-pinyin/bindings/ahk2/README.md) (Chinese pinyin matching)
 
@@ -220,7 +220,7 @@ bool is_match = ib_pinyin_is_match_u32c(U"pysousuoeve", U"拼音搜索Everything
 ```
 
 ### C++
-[原实现](ib-pinyin-cpp/README.md)（停止维护）
+[原实现](ib-pinyin-cpp/README.md)
 
 ### [AutoHotkey v2](ib-pinyin/bindings/ahk2/README.md)
 ```ahk

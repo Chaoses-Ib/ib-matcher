@@ -1,0 +1,33 @@
+[package]
+name = "ib-pinyin-data"
+version = "0.1.0"
+edition = "2021"
+rust-version = "1.75"
+description = "A fast and multi-notation Chinese pinyin query library"
+keywords = ["pinyin", "cjk", "chinese"]
+authors.workspace = true
+homepage.workspace = true
+repository.workspace = true
+license.workspace = true
+
+[features]
+## Make [`PinyinData`] interior mutable. So it can be easily used as a `static` variable.
+inmut-data = []
+
+doc = ["dep:document-features"]
+
+[dependencies]
+arraystring = "0.3"
+bitflags = "2"
+document-features = { version = "0.2", optional = true }
+itertools = "0.14"
+
+[package.metadata.docs.rs]
+# We want to document all features.
+all-features = true
+# To test this locally, run:
+# ```
+# RUSTDOCFLAGS="--cfg docsrs" cargo +nightly doc --all-features
+# $env:RUSTDOCFLAGS="--cfg docsrs"; cargo +nightly doc --all-features
+# ```
+rustdoc-args = ["--cfg", "docsrs"]

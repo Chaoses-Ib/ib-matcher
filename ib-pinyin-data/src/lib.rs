@@ -1,4 +1,6 @@
 /*!
+A fast and multi-notation Chinese pinyin query library.
+
 See [Pinyin](https://en.wikipedia.org/wiki/Pinyin) for what is pinyin.
 
 ## Features
@@ -22,9 +24,9 @@ use std::ops::RangeInclusive;
 mod data;
 mod notation;
 
-pub(super) type PinyinCombination = [u16; data::PINYIN_COMBINATION_LEN];
+pub(crate) type PinyinCombination = [u16; data::PINYIN_COMBINATION_LEN];
 
-pub(super) struct PinyinRangeTable {
+pub(crate) struct PinyinRangeTable {
     range: RangeInclusive<u32>,
     /// Array of indices into `data::PINYINS` or `data::PINYIN_COMBINATIONS`.
     table: &'static [u16],
@@ -33,7 +35,7 @@ pub(super) struct PinyinRangeTable {
 impl PinyinRangeTable {
     const MAX_RANGE: RangeInclusive<u32> = 0x3007..=0x30EDE;
 
-    pub(super) const fn new(range: RangeInclusive<u32>, table: &'static [u16]) -> Self {
+    pub(crate) const fn new(range: RangeInclusive<u32>, table: &'static [u16]) -> Self {
         PinyinRangeTable { range, table }
     }
 }

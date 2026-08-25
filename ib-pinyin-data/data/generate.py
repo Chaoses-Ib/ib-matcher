@@ -50,5 +50,5 @@ with open('data/pinyin_compact.txt', encoding='utf-8') as f:
         read_pinyin_combinations(f)
     if f.readline() == 'pinyin_tables:\n':
         read_pinyin_tables(f)
-    with open('src/pinyin/data.rs', 'w', encoding='utf-8') as f:
+    with open('src/data.rs', 'w', encoding='utf-8') as f:
         f.write(output())

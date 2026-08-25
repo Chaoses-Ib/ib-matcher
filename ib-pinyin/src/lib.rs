@@ -35,4 +35,4 @@ See [Pinyin](https://en.wikipedia.org/wiki/Pinyin) for what is pinyin.
 pub mod matcher;
 #[cfg(feature = "minimal")]
 pub mod minimal;
-pub mod pinyin;
+pub use ib_pinyin_data as pinyin;

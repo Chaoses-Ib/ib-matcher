@@ -15,6 +15,9 @@ homepage = "https://github.com/Chaoses-Ib/ib-matcher"
 repository = "https://github.com/Chaoses-Ib/ib-matcher"
 license = "MIT"
 
+[workspace.dependencies]
+ib-pinyin-data = { path = "ib-pinyin-data", version = "0.1", default-features = false }
+
 [profile.release]
 lto = "fat"
 codegen-units = 1

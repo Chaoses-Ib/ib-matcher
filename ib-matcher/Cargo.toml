@@ -41,7 +41,7 @@ macros = []
 ## Unicode support.
 unicode = ["ib-unicode/case-fold", "regex-unicode"]
 ## Chinese pinyin match support.
-pinyin = ["dep:arraystring", "dep:bitflags"]
+pinyin = ["dep:ib-pinyin-data"]
 ## Japanese romaji match support.
 ##
 ## The dictionary will take ~4.8 MiB (5.5 MiB without compression) in the binary at the moment, much larger than pinyin's.
@@ -119,9 +119,9 @@ perf-plain-regex = ["dep:regex"]
 
 #! ### FFI
 ## Make [`pinyin::PinyinData`] interior mutable. So it can be easily used as a `static` variable.
-inmut-data = []
+inmut-data = ["ib-pinyin-data/inmut-data"]
 ## Minimal APIs that can be used in one call. See [`minimal`] for details.
-minimal = ["inmut-data", "pinyin"]
+minimal = ["inmut-data", "pinyin", "dep:bitflags"]
 ## Support for non-UTF-8 encodings. Only UTF-16 and UTF-32 at the moment.
 ##
 ## Non-UTF-8 Japanese romaji match is not yet supported.
@@ -131,10 +131,10 @@ doc = ["dep:document-features"]
 
 [dependencies]
 aho-corasick = "1"
-arraystring = { version = "0.3", optional = true }
 bitflags = { version = "2", optional = true }
 bon = "3"
 document-features = { version = "0.2", optional = true }
+ib-pinyin-data = { workspace = true, optional = true }
 ib-romaji = { version = "0.2.1", default-features = false, optional = true, path = "../ib-romaji" }
 ib-unicode = { version = "0.2", default-features = false, path = "../ib-unicode" }
 itertools = "0.14"

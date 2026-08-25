@@ -27,6 +27,7 @@ document-features = { version = "0.2", optional = true }
 ib-matcher = { version = ">=0.3, <0.5", features = [
     "pinyin",
 ], path = "../ib-matcher" }
+ib-pinyin-data = { workspace = true }
 
 [package.metadata.docs.rs]
 # We want to document all features.

@@ -396,13 +396,13 @@ name = "ib-matcher"
 version = "0.4.6"
 dependencies = [
  "aho-corasick",
- "arraystring",
  "bitflags",
  "bon",
  "criterion 0.6.0",
  "daachorse",
  "document-features",
  "ib-matcher",
+ "ib-pinyin-data",
  "ib-romaji",
  "ib-unicode",
  "itertools 0.14.0",
@@ -419,6 +419,7 @@ version = "0.3.2"
 dependencies = [
  "document-features",
  "ib-matcher",
+ "ib-pinyin-data",
 ]
 
 [[package]]
@@ -430,6 +431,16 @@ dependencies = [
  "ib-pinyin",
  "widestring",
  "winres",
+]
+
+[[package]]
+name = "ib-pinyin-data"
+version = "0.1.0"
+dependencies = [
+ "arraystring",
+ "bitflags",
+ "document-features",
+ "itertools 0.14.0",
 ]
 
 [[package]]
